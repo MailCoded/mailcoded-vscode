@@ -1,8 +1,10 @@
 node_modules/
-dist/
-out/
+/dist/
+/out/
+/coverage/
+/.vscode-test/
 *.vsix
 *.tsbuildinfo
 .DS_Store
-coverage/
-.vscode-test/
+
+# The protocol types vendored from the engine are checked in deliberately — never ignore them.

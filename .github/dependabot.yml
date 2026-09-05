@@ -1,0 +1,30 @@
+version: 2
+
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      dev-dependencies:
+        dependency-type: development
+        update-types:
+          - minor
+          - patch
+    ignore:
+      # TypeScript stays on 5.x: 7.x is the native port, too new for a security-sensitive client.
+      - dependency-name: typescript
+        update-types:
+          - version-update:semver-major
+      # @types/vscode must never rise above the engines.vscode floor in package.json.
+      - dependency-name: '@types/vscode'
+        update-types:
+          - version-update:semver-minor
+          - version-update:semver-major
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3

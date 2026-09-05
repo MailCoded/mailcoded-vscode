@@ -1,0 +1,82 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Invariants
+        run: npm run lint:invariants
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Licences
+        run: npm run license-check
+
+      - name: Build
+        run: npm run build:production
+
+      - name: Package
+        run: npx @vscode/vsce package --no-dependencies --out mailcoded.vsix
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: mailcoded-vsix
+          path: mailcoded.vsix
+          if-no-files-found: error
+
+  protocol-drift:
+    name: protocol drift (advisory)
+    runs-on: ubuntu-latest
+    # Advisory, never required: this repo carries a vendored copy of the engine's generated
+    # protocol types, and the engine's default branch moves independently of it. A red mark here
+    # means "regenerate", not "this commit is broken".
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: mailcoded-vscode
+
+      - uses: actions/checkout@v7
+        with:
+          repository: MailCoded/mailcoded
+          path: mailcoded
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: mailcoded-vscode/package-lock.json
+
+      - name: Install
+        run: npm ci
+        working-directory: mailcoded-vscode
+
+      - name: Types match the engine
+        run: npm run sync:protocol -- --check
+        working-directory: mailcoded-vscode
+        env:
+          MAILCODED_ENGINE_DIR: ${{ github.workspace }}/mailcoded

@@ -1,0 +1,587 @@
+{
+  "name": "mailcoded",
+  "displayName": "Mailcoded",
+  "description": "%extension.description%",
+  "version": "0.1.0",
+  "publisher": "mailcoded",
+  "license": "MIT",
+  "author": "Yu Lin (@lywedo)",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/MailCoded/mailcoded-vscode.git"
+  },
+  "bugs": {
+    "url": "https://github.com/MailCoded/mailcoded-vscode/issues"
+  },
+  "homepage": "https://github.com/MailCoded/mailcoded-vscode#readme",
+  "engines": {
+    "vscode": "^1.96.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "email",
+    "mail",
+    "imap",
+    "smtp",
+    "mailcoded"
+  ],
+  "extensionKind": [
+    "workspace"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "%capabilities.untrustedWorkspaces.description%",
+      "restrictedConfigurations": [
+        "mailcoded.daemonPath",
+        "mailcoded.dataDir"
+      ]
+    },
+    "virtualWorkspaces": {
+      "supported": "limited",
+      "description": "%capabilities.virtualWorkspaces.description%"
+    }
+  },
+  "main": "./dist/extension.js",
+  "activationEvents": [],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "mailcoded",
+          "title": "%viewsContainer.mailcoded.title%",
+          "icon": "media/mail.svg"
+        }
+      ]
+    },
+    "views": {
+      "mailcoded": [
+        {
+          "id": "mailcoded.accounts",
+          "name": "%view.accounts.name%"
+        },
+        {
+          "id": "mailcoded.messages",
+          "name": "%view.messages.name%"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "mailcoded.accounts",
+        "contents": "%welcome.noAccounts%",
+        "when": "mailcoded.state == 'noAccounts' && mailcoded.trusted"
+      },
+      {
+        "view": "mailcoded.accounts",
+        "contents": "%welcome.noAccounts.untrusted%",
+        "when": "mailcoded.state == 'noAccounts' && !mailcoded.trusted"
+      },
+      {
+        "view": "mailcoded.accounts",
+        "contents": "%welcome.daemonMissing%",
+        "when": "mailcoded.state == 'daemonMissing'"
+      },
+      {
+        "view": "mailcoded.accounts",
+        "contents": "%welcome.protocolMismatch%",
+        "when": "mailcoded.state == 'protocolMismatch'"
+      },
+      {
+        "view": "mailcoded.accounts",
+        "contents": "%welcome.failed%",
+        "when": "mailcoded.state == 'failed'"
+      }
+    ],
+    "commands": [
+      {
+        "command": "mailcoded.addAccount",
+        "title": "%command.addAccount.title%",
+        "category": "Mailcoded",
+        "icon": "$(add)"
+      },
+      {
+        "command": "mailcoded.sync",
+        "title": "%command.sync.title%",
+        "category": "Mailcoded",
+        "icon": "$(sync)"
+      },
+      {
+        "command": "mailcoded.syncFolder",
+        "title": "%command.syncFolder.title%",
+        "category": "Mailcoded",
+        "icon": "$(sync)"
+      },
+      {
+        "command": "mailcoded.refresh",
+        "title": "%command.refresh.title%",
+        "category": "Mailcoded",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "mailcoded.search",
+        "title": "%command.search.title%",
+        "category": "Mailcoded",
+        "icon": "$(search)"
+      },
+      {
+        "command": "mailcoded.loadMore",
+        "title": "%command.loadMore.title%",
+        "category": "Mailcoded",
+        "icon": "$(ellipsis)"
+      },
+      {
+        "command": "mailcoded.openMessage",
+        "title": "%command.openMessage.title%",
+        "category": "Mailcoded"
+      },
+      {
+        "command": "mailcoded.compose",
+        "title": "%command.compose.title%",
+        "category": "Mailcoded",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "mailcoded.reply",
+        "title": "%command.reply.title%",
+        "category": "Mailcoded",
+        "icon": "$(reply)"
+      },
+      {
+        "command": "mailcoded.replyAll",
+        "title": "%command.replyAll.title%",
+        "category": "Mailcoded",
+        "icon": "$(mail-reply)"
+      },
+      {
+        "command": "mailcoded.send",
+        "title": "%command.send.title%",
+        "category": "Mailcoded",
+        "icon": "$(send)"
+      },
+      {
+        "command": "mailcoded.archive",
+        "title": "%command.archive.title%",
+        "category": "Mailcoded",
+        "icon": "$(archive)"
+      },
+      {
+        "command": "mailcoded.toggleFlag",
+        "title": "%command.toggleFlag.title%",
+        "category": "Mailcoded",
+        "icon": "$(star-full)"
+      },
+      {
+        "command": "mailcoded.markRead",
+        "title": "%command.markRead.title%",
+        "category": "Mailcoded",
+        "icon": "$(mail-read)"
+      },
+      {
+        "command": "mailcoded.markUnread",
+        "title": "%command.markUnread.title%",
+        "category": "Mailcoded",
+        "icon": "$(mail)"
+      },
+      {
+        "command": "mailcoded.editTags",
+        "title": "%command.editTags.title%",
+        "category": "Mailcoded",
+        "icon": "$(tag)"
+      },
+      {
+        "command": "mailcoded.moveTo",
+        "title": "%command.moveTo.title%",
+        "category": "Mailcoded",
+        "icon": "$(move)"
+      },
+      {
+        "command": "mailcoded.testAccount",
+        "title": "%command.testAccount.title%",
+        "category": "Mailcoded",
+        "icon": "$(plug)"
+      },
+      {
+        "command": "mailcoded.reauthAccount",
+        "title": "%command.reauthAccount.title%",
+        "category": "Mailcoded",
+        "icon": "$(key)"
+      },
+      {
+        "command": "mailcoded.showOutbox",
+        "title": "%command.showOutbox.title%",
+        "category": "Mailcoded",
+        "icon": "$(cloud-upload)"
+      },
+      {
+        "command": "mailcoded.showDaemonLog",
+        "title": "%command.showDaemonLog.title%",
+        "category": "Mailcoded",
+        "icon": "$(output)"
+      },
+      {
+        "command": "mailcoded.showDaemonInfo",
+        "title": "%command.showDaemonInfo.title%",
+        "category": "Mailcoded",
+        "icon": "$(info)"
+      },
+      {
+        "command": "mailcoded.restartDaemon",
+        "title": "%command.restartDaemon.title%",
+        "category": "Mailcoded",
+        "icon": "$(debug-restart)"
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "mailcoded.openMessage",
+          "when": "false"
+        },
+        {
+          "command": "mailcoded.loadMore",
+          "when": "false"
+        },
+        {
+          "command": "mailcoded.addAccount",
+          "when": "mailcoded.trusted"
+        },
+        {
+          "command": "mailcoded.reauthAccount",
+          "when": "mailcoded.trusted"
+        },
+        {
+          "command": "mailcoded.compose",
+          "when": "mailcoded.trusted && mailcoded.canSend"
+        },
+        {
+          "command": "mailcoded.reply",
+          "when": "mailcoded.trusted && mailcoded.canSend"
+        },
+        {
+          "command": "mailcoded.replyAll",
+          "when": "mailcoded.trusted && mailcoded.canSend"
+        },
+        {
+          "command": "mailcoded.send",
+          "when": "mailcoded.trusted && mailcoded.canSend"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "mailcoded.addAccount",
+          "when": "view == mailcoded.accounts && mailcoded.trusted",
+          "group": "navigation@1"
+        },
+        {
+          "command": "mailcoded.sync",
+          "when": "view == mailcoded.accounts",
+          "group": "navigation@2"
+        },
+        {
+          "command": "mailcoded.refresh",
+          "when": "view == mailcoded.accounts",
+          "group": "navigation@3"
+        },
+        {
+          "command": "mailcoded.showOutbox",
+          "when": "view == mailcoded.accounts",
+          "group": "1_daemon@1"
+        },
+        {
+          "command": "mailcoded.showDaemonLog",
+          "when": "view == mailcoded.accounts",
+          "group": "1_daemon@2"
+        },
+        {
+          "command": "mailcoded.showDaemonInfo",
+          "when": "view == mailcoded.accounts",
+          "group": "1_daemon@3"
+        },
+        {
+          "command": "mailcoded.restartDaemon",
+          "when": "view == mailcoded.accounts",
+          "group": "1_daemon@4"
+        },
+        {
+          "command": "mailcoded.compose",
+          "when": "view == mailcoded.messages && mailcoded.trusted && mailcoded.canSend",
+          "group": "navigation@1"
+        },
+        {
+          "command": "mailcoded.search",
+          "when": "view == mailcoded.messages",
+          "group": "navigation@2"
+        },
+        {
+          "command": "mailcoded.refresh",
+          "when": "view == mailcoded.messages",
+          "group": "navigation@3"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "mailcoded.sync",
+          "when": "view == mailcoded.accounts && viewItem == 'account'",
+          "group": "inline@1"
+        },
+        {
+          "command": "mailcoded.testAccount",
+          "when": "view == mailcoded.accounts && viewItem == 'account'",
+          "group": "1_account@1"
+        },
+        {
+          "command": "mailcoded.reauthAccount",
+          "when": "view == mailcoded.accounts && viewItem == 'account' && mailcoded.trusted",
+          "group": "1_account@2"
+        },
+        {
+          "command": "mailcoded.showOutbox",
+          "when": "view == mailcoded.accounts && viewItem == 'account'",
+          "group": "1_account@3"
+        },
+        {
+          "command": "mailcoded.syncFolder",
+          "when": "view == mailcoded.accounts && viewItem == 'folder'",
+          "group": "inline@1"
+        },
+        {
+          "command": "mailcoded.search",
+          "when": "view == mailcoded.accounts && viewItem == 'folder'",
+          "group": "1_folder@1"
+        },
+        {
+          "command": "mailcoded.markRead",
+          "when": "view == mailcoded.messages && viewItem == 'message.unread'",
+          "group": "inline@1"
+        },
+        {
+          "command": "mailcoded.toggleFlag",
+          "when": "view == mailcoded.messages && viewItem == 'message.unread'",
+          "group": "inline@2"
+        },
+        {
+          "command": "mailcoded.archive",
+          "when": "view == mailcoded.messages && viewItem == 'message.unread'",
+          "group": "inline@3"
+        },
+        {
+          "command": "mailcoded.reply",
+          "when": "view == mailcoded.messages && viewItem == 'message.unread' && mailcoded.trusted && mailcoded.canSend",
+          "group": "1_reply@1"
+        },
+        {
+          "command": "mailcoded.replyAll",
+          "when": "view == mailcoded.messages && viewItem == 'message.unread' && mailcoded.trusted && mailcoded.canSend",
+          "group": "1_reply@2"
+        },
+        {
+          "command": "mailcoded.editTags",
+          "when": "view == mailcoded.messages && viewItem == 'message.unread'",
+          "group": "2_organize@1"
+        },
+        {
+          "command": "mailcoded.moveTo",
+          "when": "view == mailcoded.messages && viewItem == 'message.unread'",
+          "group": "2_organize@2"
+        },
+        {
+          "command": "mailcoded.markUnread",
+          "when": "view == mailcoded.messages && viewItem == 'message.read'",
+          "group": "inline@1"
+        },
+        {
+          "command": "mailcoded.toggleFlag",
+          "when": "view == mailcoded.messages && viewItem == 'message.read'",
+          "group": "inline@2"
+        },
+        {
+          "command": "mailcoded.archive",
+          "when": "view == mailcoded.messages && viewItem == 'message.read'",
+          "group": "inline@3"
+        },
+        {
+          "command": "mailcoded.reply",
+          "when": "view == mailcoded.messages && viewItem == 'message.read' && mailcoded.trusted && mailcoded.canSend",
+          "group": "1_reply@1"
+        },
+        {
+          "command": "mailcoded.replyAll",
+          "when": "view == mailcoded.messages && viewItem == 'message.read' && mailcoded.trusted && mailcoded.canSend",
+          "group": "1_reply@2"
+        },
+        {
+          "command": "mailcoded.editTags",
+          "when": "view == mailcoded.messages && viewItem == 'message.read'",
+          "group": "2_organize@1"
+        },
+        {
+          "command": "mailcoded.moveTo",
+          "when": "view == mailcoded.messages && viewItem == 'message.read'",
+          "group": "2_organize@2"
+        },
+        {
+          "command": "mailcoded.markRead",
+          "when": "view == mailcoded.messages && viewItem == 'thread'",
+          "group": "inline@1"
+        },
+        {
+          "command": "mailcoded.toggleFlag",
+          "when": "view == mailcoded.messages && viewItem == 'thread'",
+          "group": "inline@2"
+        },
+        {
+          "command": "mailcoded.archive",
+          "when": "view == mailcoded.messages && viewItem == 'thread'",
+          "group": "inline@3"
+        },
+        {
+          "command": "mailcoded.editTags",
+          "when": "view == mailcoded.messages && viewItem == 'thread'",
+          "group": "2_organize@1"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "mailcoded.send",
+          "when": "resourceLangId == mailcoded-compose && mailcoded.trusted && mailcoded.canSend",
+          "group": "navigation"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "mailcoded.send",
+        "key": "ctrl+enter",
+        "mac": "cmd+enter",
+        "when": "editorLangId == mailcoded-compose && mailcoded.trusted && mailcoded.canSend"
+      }
+    ],
+    "configuration": {
+      "title": "Mailcoded",
+      "properties": {
+        "mailcoded.daemonPath": {
+          "type": "string",
+          "default": "",
+          "scope": "machine",
+          "description": "%config.daemonPath.description%"
+        },
+        "mailcoded.dataDir": {
+          "type": "string",
+          "default": "",
+          "scope": "machine",
+          "description": "%config.dataDir.description%"
+        },
+        "mailcoded.pageSize": {
+          "type": "integer",
+          "default": 50,
+          "minimum": 10,
+          "maximum": 200,
+          "description": "%config.pageSize.description%"
+        },
+        "mailcoded.markReadOnOpen": {
+          "type": "boolean",
+          "default": true,
+          "description": "%config.markReadOnOpen.description%"
+        },
+        "mailcoded.logLevel": {
+          "type": "string",
+          "default": "info",
+          "enum": [
+            "off",
+            "error",
+            "warn",
+            "info",
+            "debug"
+          ],
+          "enumDescriptions": [
+            "%config.logLevel.off%",
+            "%config.logLevel.error%",
+            "%config.logLevel.warn%",
+            "%config.logLevel.info%",
+            "%config.logLevel.debug%"
+          ],
+          "description": "%config.logLevel.description%"
+        },
+        "mailcoded.quoteLines": {
+          "type": "integer",
+          "default": 200,
+          "minimum": 0,
+          "description": "%config.quoteLines.description%"
+        },
+        "mailcoded.threadGrouping": {
+          "type": "boolean",
+          "default": true,
+          "description": "%config.threadGrouping.description%"
+        },
+        "mailcoded.pollIntervalSeconds": {
+          "type": "integer",
+          "default": 60,
+          "minimum": 15,
+          "description": "%config.pollIntervalSeconds.description%"
+        }
+      }
+    },
+    "languages": [
+      {
+        "id": "mailcoded-compose",
+        "aliases": [
+          "Mail draft"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "mailcoded-compose",
+        "scopeName": "text.mailcoded-compose",
+        "path": "./syntaxes/mailcoded-compose.tmLanguage.json"
+      }
+    ],
+    "configurationDefaults": {
+      "[mailcoded-compose]": {
+        "editor.wordWrap": "on",
+        "editor.minimap.enabled": false,
+        "editor.quickSuggestions": false
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run build:production",
+    "build": "node esbuild.mjs",
+    "build:production": "node esbuild.mjs --production",
+    "watch": "node esbuild.mjs --watch",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.webview.json && tsc --noEmit -p tsconfig.test.json",
+    "lint": "eslint .",
+    "lint:invariants": "node scripts/lint-invariants.mjs",
+    "license-check": "node scripts/license-check.mjs",
+    "test:unit": "mocha --import tsx \"test/unit/**/*.test.ts\"",
+    "test:sanitize": "mocha --import tsx \"test/sanitize/**/*.test.ts\"",
+    "test:e2e": "node test/e2e/runTest.js",
+    "package": "vsce package --no-dependencies",
+    "sync:protocol": "node scripts/sync-protocol.mjs"
+  },
+  "dependencies": {
+    "dompurify": "^3.4.14",
+    "vscode-jsonrpc": "^9.0.2"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/jsdom": "^30.0.0",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^22.20.1",
+    "@types/vscode": "~1.96.0",
+    "@vscode/test-electron": "^3.1.0",
+    "@vscode/vsce": "^3.9.2",
+    "esbuild": "^0.28.2",
+    "eslint": "^10.10.0",
+    "globals": "^17.12.0",
+    "jsdom": "^30.0.1",
+    "mocha": "^12.0.0",
+    "tsx": "^4.23.13",
+    "typescript": "^5.9.0",
+    "typescript-eslint": "^8.69.0"
+  }
+}

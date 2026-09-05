@@ -1,0 +1,35 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Mail draft",
+  "scopeName": "text.mailcoded-compose",
+  "patterns": [
+    { "include": "#header-block" },
+    { "include": "#separator" },
+    { "include": "#quoted-line" }
+  ],
+  "repository": {
+    "header-block": {
+      "begin": "^(?=(?:From|To|Cc|Bcc|Subject|In-Reply-To|References):)",
+      "end": "^(?=---$|$)",
+      "patterns": [
+        { "include": "#header-field" }
+      ]
+    },
+    "header-field": {
+      "match": "^(From|To|Cc|Bcc|Subject|In-Reply-To|References)(:)(.*)$",
+      "captures": {
+        "1": { "name": "keyword.other.header.mailcoded-compose" },
+        "2": { "name": "punctuation.separator.key-value.mailcoded-compose" },
+        "3": { "name": "string.unquoted.header-value.mailcoded-compose" }
+      }
+    },
+    "separator": {
+      "match": "^---$",
+      "name": "punctuation.separator.header-body.mailcoded-compose"
+    },
+    "quoted-line": {
+      "match": "^[ \\t]*>.*$",
+      "name": "comment.block.quote.mailcoded-compose"
+    }
+  }
+}
