@@ -12,17 +12,6 @@
         // The daemon is never installed for development; point F5 at the sibling engine's Debug build.
         "MAILCODED_DAEMON": "${workspaceFolder}/../mailcoded/src/Mailcoded.Daemon/bin/Debug/net10.0/mailcoded-daemon"
       }
-    },
-    {
-      "name": "Extension Tests",
-      "type": "extensionHost",
-      "request": "launch",
-      "args": [
-        "--extensionDevelopmentPath=${workspaceFolder}",
-        "--extensionTestsPath=${workspaceFolder}/out/test/e2e/index"
-      ],
-      "outFiles": ["${workspaceFolder}/dist/**/*.js", "${workspaceFolder}/out/**/*.js"],
-      "preLaunchTask": "npm: watch"
     }
   ]
 }
