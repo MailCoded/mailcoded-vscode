@@ -8,3 +8,16 @@ node_modules/
 .DS_Store
 
 # The protocol types vendored from the engine are checked in deliberately — never ignore them.
+
+# Sandbox artefacts, not project files
+/.claude/
+/.mcp.json
+/.bash_profile
+/.bashrc
+/.gitconfig
+/.gitmodules
+/.idea
+/.profile
+/.ripgreprc
+/.zprofile
+/.zshrc

@@ -71,13 +71,18 @@
     "viewsWelcome": [
       {
         "view": "mailcoded.accounts",
-        "contents": "%welcome.noAccounts%",
-        "when": "mailcoded.state == 'noAccounts' && mailcoded.trusted"
+        "contents": "%welcome.connected%",
+        "when": "mailcoded.state == 'ready' || mailcoded.state == 'secondary'"
       },
       {
         "view": "mailcoded.accounts",
-        "contents": "%welcome.noAccounts.untrusted%",
-        "when": "mailcoded.state == 'noAccounts' && !mailcoded.trusted"
+        "contents": "%welcome.noAccounts%",
+        "when": "mailcoded.state == 'noAccounts'"
+      },
+      {
+        "view": "mailcoded.accounts",
+        "contents": "%welcome.starting%",
+        "when": "mailcoded.state == 'starting' || mailcoded.state == 'restarting'"
       },
       {
         "view": "mailcoded.accounts",
@@ -96,125 +101,6 @@
       }
     ],
     "commands": [
-      {
-        "command": "mailcoded.addAccount",
-        "title": "%command.addAccount.title%",
-        "category": "Mailcoded",
-        "icon": "$(add)"
-      },
-      {
-        "command": "mailcoded.sync",
-        "title": "%command.sync.title%",
-        "category": "Mailcoded",
-        "icon": "$(sync)"
-      },
-      {
-        "command": "mailcoded.syncFolder",
-        "title": "%command.syncFolder.title%",
-        "category": "Mailcoded",
-        "icon": "$(sync)"
-      },
-      {
-        "command": "mailcoded.refresh",
-        "title": "%command.refresh.title%",
-        "category": "Mailcoded",
-        "icon": "$(refresh)"
-      },
-      {
-        "command": "mailcoded.search",
-        "title": "%command.search.title%",
-        "category": "Mailcoded",
-        "icon": "$(search)"
-      },
-      {
-        "command": "mailcoded.loadMore",
-        "title": "%command.loadMore.title%",
-        "category": "Mailcoded",
-        "icon": "$(ellipsis)"
-      },
-      {
-        "command": "mailcoded.openMessage",
-        "title": "%command.openMessage.title%",
-        "category": "Mailcoded"
-      },
-      {
-        "command": "mailcoded.compose",
-        "title": "%command.compose.title%",
-        "category": "Mailcoded",
-        "icon": "$(edit)"
-      },
-      {
-        "command": "mailcoded.reply",
-        "title": "%command.reply.title%",
-        "category": "Mailcoded",
-        "icon": "$(reply)"
-      },
-      {
-        "command": "mailcoded.replyAll",
-        "title": "%command.replyAll.title%",
-        "category": "Mailcoded",
-        "icon": "$(mail-reply)"
-      },
-      {
-        "command": "mailcoded.send",
-        "title": "%command.send.title%",
-        "category": "Mailcoded",
-        "icon": "$(send)"
-      },
-      {
-        "command": "mailcoded.archive",
-        "title": "%command.archive.title%",
-        "category": "Mailcoded",
-        "icon": "$(archive)"
-      },
-      {
-        "command": "mailcoded.toggleFlag",
-        "title": "%command.toggleFlag.title%",
-        "category": "Mailcoded",
-        "icon": "$(star-full)"
-      },
-      {
-        "command": "mailcoded.markRead",
-        "title": "%command.markRead.title%",
-        "category": "Mailcoded",
-        "icon": "$(mail-read)"
-      },
-      {
-        "command": "mailcoded.markUnread",
-        "title": "%command.markUnread.title%",
-        "category": "Mailcoded",
-        "icon": "$(mail)"
-      },
-      {
-        "command": "mailcoded.editTags",
-        "title": "%command.editTags.title%",
-        "category": "Mailcoded",
-        "icon": "$(tag)"
-      },
-      {
-        "command": "mailcoded.moveTo",
-        "title": "%command.moveTo.title%",
-        "category": "Mailcoded",
-        "icon": "$(move)"
-      },
-      {
-        "command": "mailcoded.testAccount",
-        "title": "%command.testAccount.title%",
-        "category": "Mailcoded",
-        "icon": "$(plug)"
-      },
-      {
-        "command": "mailcoded.reauthAccount",
-        "title": "%command.reauthAccount.title%",
-        "category": "Mailcoded",
-        "icon": "$(key)"
-      },
-      {
-        "command": "mailcoded.showOutbox",
-        "title": "%command.showOutbox.title%",
-        "category": "Mailcoded",
-        "icon": "$(cloud-upload)"
-      },
       {
         "command": "mailcoded.showDaemonLog",
         "title": "%command.showDaemonLog.title%",
@@ -235,61 +121,7 @@
       }
     ],
     "menus": {
-      "commandPalette": [
-        {
-          "command": "mailcoded.openMessage",
-          "when": "false"
-        },
-        {
-          "command": "mailcoded.loadMore",
-          "when": "false"
-        },
-        {
-          "command": "mailcoded.addAccount",
-          "when": "mailcoded.trusted"
-        },
-        {
-          "command": "mailcoded.reauthAccount",
-          "when": "mailcoded.trusted"
-        },
-        {
-          "command": "mailcoded.compose",
-          "when": "mailcoded.trusted && mailcoded.canSend"
-        },
-        {
-          "command": "mailcoded.reply",
-          "when": "mailcoded.trusted && mailcoded.canSend"
-        },
-        {
-          "command": "mailcoded.replyAll",
-          "when": "mailcoded.trusted && mailcoded.canSend"
-        },
-        {
-          "command": "mailcoded.send",
-          "when": "mailcoded.trusted && mailcoded.canSend"
-        }
-      ],
       "view/title": [
-        {
-          "command": "mailcoded.addAccount",
-          "when": "view == mailcoded.accounts && mailcoded.trusted",
-          "group": "navigation@1"
-        },
-        {
-          "command": "mailcoded.sync",
-          "when": "view == mailcoded.accounts",
-          "group": "navigation@2"
-        },
-        {
-          "command": "mailcoded.refresh",
-          "when": "view == mailcoded.accounts",
-          "group": "navigation@3"
-        },
-        {
-          "command": "mailcoded.showOutbox",
-          "when": "view == mailcoded.accounts",
-          "group": "1_daemon@1"
-        },
         {
           "command": "mailcoded.showDaemonLog",
           "when": "view == mailcoded.accounts",
@@ -304,161 +136,9 @@
           "command": "mailcoded.restartDaemon",
           "when": "view == mailcoded.accounts",
           "group": "1_daemon@4"
-        },
-        {
-          "command": "mailcoded.compose",
-          "when": "view == mailcoded.messages && mailcoded.trusted && mailcoded.canSend",
-          "group": "navigation@1"
-        },
-        {
-          "command": "mailcoded.search",
-          "when": "view == mailcoded.messages",
-          "group": "navigation@2"
-        },
-        {
-          "command": "mailcoded.refresh",
-          "when": "view == mailcoded.messages",
-          "group": "navigation@3"
-        }
-      ],
-      "view/item/context": [
-        {
-          "command": "mailcoded.sync",
-          "when": "view == mailcoded.accounts && viewItem == 'account'",
-          "group": "inline@1"
-        },
-        {
-          "command": "mailcoded.testAccount",
-          "when": "view == mailcoded.accounts && viewItem == 'account'",
-          "group": "1_account@1"
-        },
-        {
-          "command": "mailcoded.reauthAccount",
-          "when": "view == mailcoded.accounts && viewItem == 'account' && mailcoded.trusted",
-          "group": "1_account@2"
-        },
-        {
-          "command": "mailcoded.showOutbox",
-          "when": "view == mailcoded.accounts && viewItem == 'account'",
-          "group": "1_account@3"
-        },
-        {
-          "command": "mailcoded.syncFolder",
-          "when": "view == mailcoded.accounts && viewItem == 'folder'",
-          "group": "inline@1"
-        },
-        {
-          "command": "mailcoded.search",
-          "when": "view == mailcoded.accounts && viewItem == 'folder'",
-          "group": "1_folder@1"
-        },
-        {
-          "command": "mailcoded.markRead",
-          "when": "view == mailcoded.messages && viewItem == 'message.unread'",
-          "group": "inline@1"
-        },
-        {
-          "command": "mailcoded.toggleFlag",
-          "when": "view == mailcoded.messages && viewItem == 'message.unread'",
-          "group": "inline@2"
-        },
-        {
-          "command": "mailcoded.archive",
-          "when": "view == mailcoded.messages && viewItem == 'message.unread'",
-          "group": "inline@3"
-        },
-        {
-          "command": "mailcoded.reply",
-          "when": "view == mailcoded.messages && viewItem == 'message.unread' && mailcoded.trusted && mailcoded.canSend",
-          "group": "1_reply@1"
-        },
-        {
-          "command": "mailcoded.replyAll",
-          "when": "view == mailcoded.messages && viewItem == 'message.unread' && mailcoded.trusted && mailcoded.canSend",
-          "group": "1_reply@2"
-        },
-        {
-          "command": "mailcoded.editTags",
-          "when": "view == mailcoded.messages && viewItem == 'message.unread'",
-          "group": "2_organize@1"
-        },
-        {
-          "command": "mailcoded.moveTo",
-          "when": "view == mailcoded.messages && viewItem == 'message.unread'",
-          "group": "2_organize@2"
-        },
-        {
-          "command": "mailcoded.markUnread",
-          "when": "view == mailcoded.messages && viewItem == 'message.read'",
-          "group": "inline@1"
-        },
-        {
-          "command": "mailcoded.toggleFlag",
-          "when": "view == mailcoded.messages && viewItem == 'message.read'",
-          "group": "inline@2"
-        },
-        {
-          "command": "mailcoded.archive",
-          "when": "view == mailcoded.messages && viewItem == 'message.read'",
-          "group": "inline@3"
-        },
-        {
-          "command": "mailcoded.reply",
-          "when": "view == mailcoded.messages && viewItem == 'message.read' && mailcoded.trusted && mailcoded.canSend",
-          "group": "1_reply@1"
-        },
-        {
-          "command": "mailcoded.replyAll",
-          "when": "view == mailcoded.messages && viewItem == 'message.read' && mailcoded.trusted && mailcoded.canSend",
-          "group": "1_reply@2"
-        },
-        {
-          "command": "mailcoded.editTags",
-          "when": "view == mailcoded.messages && viewItem == 'message.read'",
-          "group": "2_organize@1"
-        },
-        {
-          "command": "mailcoded.moveTo",
-          "when": "view == mailcoded.messages && viewItem == 'message.read'",
-          "group": "2_organize@2"
-        },
-        {
-          "command": "mailcoded.markRead",
-          "when": "view == mailcoded.messages && viewItem == 'thread'",
-          "group": "inline@1"
-        },
-        {
-          "command": "mailcoded.toggleFlag",
-          "when": "view == mailcoded.messages && viewItem == 'thread'",
-          "group": "inline@2"
-        },
-        {
-          "command": "mailcoded.archive",
-          "when": "view == mailcoded.messages && viewItem == 'thread'",
-          "group": "inline@3"
-        },
-        {
-          "command": "mailcoded.editTags",
-          "when": "view == mailcoded.messages && viewItem == 'thread'",
-          "group": "2_organize@1"
-        }
-      ],
-      "editor/title": [
-        {
-          "command": "mailcoded.send",
-          "when": "resourceLangId == mailcoded-compose && mailcoded.trusted && mailcoded.canSend",
-          "group": "navigation"
         }
       ]
     },
-    "keybindings": [
-      {
-        "command": "mailcoded.send",
-        "key": "ctrl+enter",
-        "mac": "cmd+enter",
-        "when": "editorLangId == mailcoded-compose && mailcoded.trusted && mailcoded.canSend"
-      }
-    ],
     "configuration": {
       "title": "Mailcoded",
       "properties": {
