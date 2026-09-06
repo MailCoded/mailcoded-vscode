@@ -5,12 +5,12 @@
   "viewsContainer.mailcoded.title": "Mail",
   "view.accounts.name": "Accounts",
   "view.messages.name": "Messages",
-  "welcome.noAccounts": "No mail accounts yet.\nAdding an account from the editor is not built yet. Run `mailcoded setup` in a terminal, then restart the daemon.\n[Restart daemon](command:mailcoded.restartDaemon)",
+  "welcome.noAccounts": "Connected to the mailcoded daemon, but it has no mail accounts.\nAdding an account from the editor is not built yet. Run `mailcoded setup` in a terminal, then refresh.\n[Refresh](command:mailcoded.refresh)\n[Restart daemon](command:mailcoded.restartDaemon)",
   "welcome.daemonMissing": "The mailcoded daemon could not be started.\n[Set daemon path](command:workbench.action.openSettings?%5B%22mailcoded.daemonPath%22%5D)\n[Show log](command:mailcoded.showDaemonLog)\nInstall the daemon from the mailcoded engine, or point the setting at the binary you already have.",
   "welcome.protocolMismatch": "The daemon speaks a JSON-RPC protocol version this extension does not understand.\nUpdate whichever of the two is older, then reload. Mailcoded: Show Daemon Info reports both versions.",
   "welcome.failed": "The mailcoded daemon stopped unexpectedly.\n[Restart daemon](command:mailcoded.restartDaemon)\n[Show log](command:mailcoded.showDaemonLog)",
   "command.addAccount.title": "Add Account...",
-  "command.sync.title": "Sync Account",
+  "command.sync.title": "Sync All Accounts",
   "command.syncFolder.title": "Sync Folder",
   "command.refresh.title": "Refresh",
   "command.search.title": "Search Mail...",
@@ -45,6 +45,6 @@
   "config.quoteLines.description": "Maximum number of lines of the original message quoted into a reply.",
   "config.threadGrouping.description": "Group the message list into conversation threads.",
   "config.pollIntervalSeconds.description": "How often the daemon polls a folder for new mail when the server does not support IMAP IDLE.",
-  "welcome.connected": "Connected to the mailcoded daemon.\nThe accounts and message list are not built yet, so this panel stays empty for now.\n[Show daemon info](command:mailcoded.showDaemonInfo)\n[Show log](command:mailcoded.showDaemonLog)",
+  "welcome.connected": "Connected to the mailcoded daemon.\nYour accounts and folders appear here as soon as they load.\n[Refresh](command:mailcoded.refresh)\n[Show daemon info](command:mailcoded.showDaemonInfo)",
   "welcome.starting": "Starting the mailcoded daemon…\n[Show log](command:mailcoded.showDaemonLog)"
 }

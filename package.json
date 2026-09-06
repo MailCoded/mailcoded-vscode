@@ -102,6 +102,24 @@
     ],
     "commands": [
       {
+        "command": "mailcoded.sync",
+        "title": "%command.sync.title%",
+        "category": "Mailcoded",
+        "icon": "$(sync)"
+      },
+      {
+        "command": "mailcoded.syncFolder",
+        "title": "%command.syncFolder.title%",
+        "category": "Mailcoded",
+        "icon": "$(sync)"
+      },
+      {
+        "command": "mailcoded.refresh",
+        "title": "%command.refresh.title%",
+        "category": "Mailcoded",
+        "icon": "$(refresh)"
+      },
+      {
         "command": "mailcoded.showDaemonLog",
         "title": "%command.showDaemonLog.title%",
         "category": "Mailcoded",
@@ -123,6 +141,16 @@
     "menus": {
       "view/title": [
         {
+          "command": "mailcoded.sync",
+          "when": "view == mailcoded.accounts",
+          "group": "navigation@1"
+        },
+        {
+          "command": "mailcoded.refresh",
+          "when": "view == mailcoded.accounts",
+          "group": "navigation@2"
+        },
+        {
           "command": "mailcoded.showDaemonLog",
           "when": "view == mailcoded.accounts",
           "group": "1_daemon@2"
@@ -136,6 +164,19 @@
           "command": "mailcoded.restartDaemon",
           "when": "view == mailcoded.accounts",
           "group": "1_daemon@4"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "mailcoded.syncFolder",
+          "when": "view == mailcoded.accounts && viewItem == folder",
+          "group": "1_sync@1"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "mailcoded.syncFolder",
+          "when": "false"
         }
       ]
     },

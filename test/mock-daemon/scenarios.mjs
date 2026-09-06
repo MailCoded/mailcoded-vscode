@@ -178,6 +178,98 @@ const SYNC_ERROR = {
   atUtc: "2026-08-30T12:34:56.000Z",
 };
 
+/** The store the sidebar is built for: one imported account, one Outlook-shaped one. */
+export const TREE_ACCOUNTS = [
+  {
+    id: 1,
+    email: "local@import.mailcoded.test",
+    displayName: "Local import",
+    provider: "imap",
+    auth: "password",
+    quirks: [],
+  },
+  {
+    id: 2,
+    email: "outlook.user@outlook.test",
+    displayName: "Outlook",
+    provider: "graph",
+    auth: "oauth2",
+    quirks: [],
+  },
+];
+
+/** Deliberately not in role order, and 'Projects' is absent while 'Projects/Alpha' is listed. */
+export const TREE_FOLDERS = {
+  1: [{ id: 101, accountId: 1, name: "INBOX", role: "inbox", unread: 5, total: 37 }],
+  2: [
+    { id: 202, accountId: 2, name: "Archive", role: "archive", unread: 0, total: 1804 },
+    { id: 207, accountId: 2, name: "Projects/Alpha", unread: 2, total: 8 },
+    { id: 204, accountId: 2, name: "Sent", role: "sent", unread: 0, total: 512 },
+    { id: 201, accountId: 2, name: "INBOX", role: "inbox", unread: 12, total: 240 },
+    { id: 208, accountId: 2, name: "Newsletters", unread: 3, total: 96 },
+    { id: 205, accountId: 2, name: "Papierkorb", role: "trash", unread: 0, total: 64 },
+    { id: 203, accountId: 2, name: "Drafts", role: "drafts", unread: 1, total: 3 },
+    { id: 206, accountId: 2, name: "Junk", role: "junk", unread: 7, total: 19 },
+  ],
+};
+
+/** ESC, U+202E and U+200B, exactly as a server is free to name a folder. */
+export const HOSTILE_FOLDER_NAME = [
+  String.fromCodePoint(0x1b),
+  "[31mAlerts",
+  String.fromCodePoint(0x202e),
+  "gnp.txt",
+  String.fromCodePoint(0x200b),
+].join("");
+
+const HOSTILE_FOLDERS = {
+  1: [
+    { id: 101, accountId: 1, name: "INBOX", role: "inbox", unread: 5, total: 37 },
+    { id: 102, accountId: 1, name: HOSTILE_FOLDER_NAME, unread: 1, total: 1 },
+  ],
+  2: TREE_FOLDERS[2],
+};
+
+/** What the `accounts` scenarios push on `watch.subscribe`, so a test can trigger one on demand. */
+export const TREE_FOLDER_UPDATED = {
+  accountId: 2,
+  folder: { id: 201, accountId: 2, name: "INBOX", role: "inbox", unread: 13, total: 241 },
+};
+
+function accountsScenario({ accounts = TREE_ACCOUNTS, folders = TREE_FOLDERS, failFor = [], watch = true } = {}) {
+  const failing = new Set(failFor);
+  return {
+    initializeOptions: { watch },
+    handle(ctx, request) {
+      const { method, id, params } = request;
+      if (method === "account.list") {
+        ctx.reply(id, { accounts });
+        return;
+      }
+      if (method === "folder.list") {
+        const accountId = params?.accountId;
+        const owned = failing.has(accountId) ? undefined : folders[accountId];
+        if (owned === undefined) {
+          ctx.error(id, GOLDEN_FOLDER_LIST_UNKNOWN.code, `No folders for account ${accountId}.`, {
+            category: "notFound",
+            requiresUserAction: false,
+            accountId,
+          });
+          return;
+        }
+        ctx.reply(id, { folders: owned });
+        return;
+      }
+      if (method === "watch.subscribe") {
+        ctx.reply(id, {});
+        ctx.notify("notify.folder.updated", TREE_FOLDER_UPDATED);
+        return;
+      }
+      baseHandle(ctx, request);
+    },
+  };
+}
+
 export const SCENARIOS = {
   happy: { handle: baseHandle },
 
@@ -254,6 +346,17 @@ export const SCENARIOS = {
     },
     handle() {},
   },
+
+  /** Two accounts and a folder set per account: the shape the sidebar is specified against. */
+  accounts: accountsScenario(),
+
+  /** Another mailcoded owns the store lock: every request answers, no notification arrives. */
+  accountsSecondary: accountsScenario({ watch: false }),
+
+  /** One account's folders are unreachable; the other account must still render. */
+  accountsPartialFailure: accountsScenario({ failFor: [2] }),
+
+  accountsHostileLabels: accountsScenario({ folders: HOSTILE_FOLDERS }),
 
 };
 

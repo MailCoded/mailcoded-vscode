@@ -1,4 +1,6 @@
 import { createDaemonSupervisor } from "../src/daemon/supervisor.js";
+import { buildFolderTree } from "../src/model/folderTree.js";
+import type { FolderNode } from "../src/model/folderTree.js";
 
 const DAEMON = process.env["MAILCODED_DAEMON"] ?? "";
 
@@ -22,6 +24,18 @@ async function main(): Promise<void> {
     process.stdout.write(`watch       ${String(status.capabilities.watch)}\n`);
     const accounts = await supervisor.client.accountList();
     process.stdout.write(`accounts    ${accounts.length}\n`);
+    for (const account of accounts) {
+      const folders = await supervisor.client.folderList(account.id);
+      const tree = buildFolderTree(account, folders);
+      process.stdout.write(`\n  ${tree.account.email}  ${tree.unread}/${tree.total} unread/total, ${folders.length} folders\n`);
+      const walk = (nodes: readonly FolderNode[], depth: number): void => {
+        for (const node of nodes) {
+          process.stdout.write(`    ${"  ".repeat(depth)}${node.label}  ${node.unread}/${node.total}\n`);
+          walk(node.children, depth + 1);
+        }
+      };
+      walk(tree.children, 0);
+    }
   } else {
     process.stdout.write(`detail      ${status.detail ?? "(none)"}\n`);
   }

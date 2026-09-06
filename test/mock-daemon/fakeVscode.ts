@@ -212,3 +212,37 @@ export const StatusBarAlignment = { Left: 1, Right: 2 } as const;
 export const ExtensionMode = { Production: 1, Development: 2, Test: 3 } as const;
 export const LogLevel = { Off: 0, Trace: 1, Debug: 2, Info: 3, Warning: 4, Error: 5 } as const;
 export const version = "1.96.0";
+
+export const TreeItemCollapsibleState = { None: 0, Collapsed: 1, Expanded: 2 } as const;
+
+export class ThemeIcon {
+  constructor(
+    readonly id: string,
+    readonly color?: ThemeColor,
+  ) {}
+}
+
+export class ThemeColor {
+  constructor(readonly id: string) {}
+}
+
+export class TreeItem {
+  label: string | { label: string; highlights?: readonly [number, number][] };
+  collapsibleState: number;
+  id?: string;
+  description?: string | boolean;
+  tooltip?: string;
+  contextValue?: string;
+  iconPath?: ThemeIcon;
+  command?: { command: string; title: string; arguments?: readonly unknown[] };
+  resourceUri?: unknown;
+  accessibilityInformation?: { label: string };
+
+  constructor(
+    label: string | { label: string; highlights?: readonly [number, number][] },
+    collapsibleState: number = TreeItemCollapsibleState.None,
+  ) {
+    this.label = label;
+    this.collapsibleState = collapsibleState;
+  }
+}
