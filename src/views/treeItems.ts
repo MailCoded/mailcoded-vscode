@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 
 import type { AccountNode, FolderNode } from "../model/folderTree.js";
+import { hardenLine } from "../model/messageFormat.js";
 
 /** Identity the tree view holds on to: `node` is replaced in place when counts change, so a
  * scoped `onDidChangeTreeData` still names an element VS Code recognises. */
@@ -20,23 +21,6 @@ export interface FolderTreeNode {
 
 export type MailcodedTreeNode = AccountTreeNode | FolderTreeNode;
 
-/** C0 and C1 controls, the zero-width and bidi overrides, and the tag block. Tab, newline and the
- * other whitespace controls are absent on purpose: the collapse below turns them into a space. */
-const STRIPPED: readonly (readonly [number, number])[] = [
-  [0x00, 0x08],
-  [0x0e, 0x1f],
-  [0x7f, 0x9f],
-  [0x200b, 0x200f],
-  [0x202a, 0x202e],
-  [0x2066, 0x2069],
-  [0xfeff, 0xfeff],
-  [0xe0000, 0xe007f],
-];
-
-const WHITESPACE = /\s+/g;
-const ELLIPSIS = "\u2026";
-const MAX_LENGTH = 200;
-
 const ROLE_ICONS: Readonly<Record<string, string>> = {
   inbox: "inbox",
   drafts: "edit",
@@ -49,30 +33,11 @@ const ROLE_ICONS: Readonly<Record<string, string>> = {
 
 const FOLDER_ICON = "folder";
 
-function isStripped(point: number): boolean {
-  for (const [low, high] of STRIPPED) {
-    if (point >= low && point <= high) {
-      return true;
-    }
-  }
-  return false;
-}
-
 /** Folder names and display names are server-controlled: a bidi override or a tag-block sequence
- * would otherwise rewrite the row around it, and a control character would reach the terminal. */
+ * would otherwise rewrite the row around it, and a control character would reach the terminal.
+ * One implementation, in the model, so the two tables cannot drift apart. */
 export function harden(text: string): string {
-  const kept: string[] = [];
-  for (const character of text) {
-    if (!isStripped(character.codePointAt(0) ?? 0)) {
-      kept.push(character);
-    }
-  }
-
-  const collapsed = kept.join("").replace(WHITESPACE, " ").trim();
-  const points = Array.from(collapsed);
-  return points.length <= MAX_LENGTH
-    ? collapsed
-    : `${points.slice(0, MAX_LENGTH - 1).join("")}${ELLIPSIS}`;
+  return hardenLine(text);
 }
 
 function counts(unread: number, total: number): string {

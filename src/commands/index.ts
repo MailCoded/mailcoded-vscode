@@ -1,11 +1,14 @@
 import * as vscode from "vscode";
 
+import { setTags as applyTagDelta } from "../daemon/client.js";
 import { explain, isRpcError } from "../daemon/errors.js";
 import type { MailcodedDaemonSupervisor } from "../daemon/supervisor.js";
 import type { DaemonStatus } from "../daemon/types.js";
-import type { AccountDto } from "../protocol/index.js";
-import { RpcErrorCode } from "../protocol/index.js";
+import type { AccountDto, EnvelopeDto } from "../protocol/index.js";
+import { FlagNames, RpcErrorCode } from "../protocol/index.js";
+import type { MessageReader, MessageTagger } from "../reader/messageDocument.js";
 import type { FolderTreeNode } from "../views/accountsTree.js";
+import type { FolderScope, MessageScope } from "../views/messagesTree.js";
 import type { MailcodedStatusBar } from "../views/statusBar.js";
 import { harden } from "../views/treeItems.js";
 
@@ -15,17 +18,47 @@ export const COMMAND_RESTART_DAEMON = "mailcoded.restartDaemon";
 export const COMMAND_REFRESH = "mailcoded.refresh";
 export const COMMAND_SYNC = "mailcoded.sync";
 export const COMMAND_SYNC_FOLDER = "mailcoded.syncFolder";
+export const COMMAND_OPEN_FOLDER = "mailcoded.openFolder";
+export const COMMAND_OPEN_MESSAGE = "mailcoded.openMessage";
+export const COMMAND_LOAD_MORE = "mailcoded.loadMore";
+export const COMMAND_SEARCH = "mailcoded.search";
+export const COMMAND_MARK_READ = "mailcoded.markRead";
+export const COMMAND_MARK_UNREAD = "mailcoded.markUnread";
+export const COMMAND_TOGGLE_FLAG = "mailcoded.toggleFlag";
 
 const SHOW_LOG = "Show Daemon Log";
+
+const PICK_A_MESSAGE = "Select a message in the Mailcoded messages view first.";
+
+const KNOWN_FLAGS: ReadonlySet<string> = new Set(Object.values(FlagNames));
 
 /** Structural on purpose: the commands need the tree's cache cleared, not its node type. */
 export interface RefreshableTree {
   refresh(): void;
 }
 
+/** The half of the messages view the commands drive; `MessagesTreeProvider` satisfies it. */
+export interface MessagesView extends RefreshableTree {
+  readonly scope: MessageScope | undefined;
+  show(scope: MessageScope): void;
+  loadMore(): Promise<void>;
+  patch(envelope: EnvelopeDto): void;
+}
+
+/** Selection lives on the tree views, which `extension.ts` owns rather than this module. */
+export interface CommandSelection {
+  accountId(): number | undefined;
+  message(): EnvelopeDto | undefined;
+  revealMessages(): void;
+}
+
 export interface CommandDependencies {
   readonly tree: RefreshableTree;
   readonly statusBar: MailcodedStatusBar;
+  readonly messages: MessagesView;
+  readonly reader: MessageReader;
+  readonly tagger: MessageTagger;
+  readonly selection: CommandSelection;
 }
 
 interface FolderTarget {
@@ -67,6 +100,49 @@ function isFolderNode(value: unknown): value is FolderTreeNode {
     typeof ref["accountId"] === "number" &&
     asRecord(ref["node"]) !== undefined
   );
+}
+
+function isMessageNode(value: unknown): value is { readonly envelope: EnvelopeDto } {
+  const ref = asRecord(value);
+  return ref?.["kind"] === "message" && typeof asRecord(ref["envelope"])?.["id"] === "number";
+}
+
+/** A context menu names its row; the palette names nothing, so the view's selection answers. */
+function envelopeOf(node: unknown, deps: CommandDependencies): EnvelopeDto | undefined {
+  return isMessageNode(node) ? node.envelope : deps.selection.message();
+}
+
+function folderScope(target: unknown): FolderScope | undefined {
+  const ref = asRecord(target);
+  const accountId = ref?.["accountId"];
+  const folderId = ref?.["folderId"];
+  const folderName = ref?.["folderName"];
+  return typeof accountId === "number" && typeof folderId === "number" && typeof folderName === "string"
+    ? { accountId, folderId, folderName }
+    : undefined;
+}
+
+function carries(envelope: EnvelopeDto, flag: string): boolean {
+  return envelope.flags.includes(flag) || envelope.tags.includes(flag);
+}
+
+/** `tags.set` returns the whole tag set and the daemon projects the flags in the same
+ * transaction, so the row is re-derived rather than patched. */
+function restamp(envelope: EnvelopeDto, tags: readonly string[]): EnvelopeDto {
+  return { ...envelope, tags, flags: tags.filter((tag) => KNOWN_FLAGS.has(tag)) };
+}
+
+/** One writer for every tag change, so the reader and the list patch the row the same way. */
+export function createMessageTagger(
+  supervisor: MailcodedDaemonSupervisor,
+  messages: MessagesView,
+): MessageTagger {
+  return {
+    async setTags(envelope: EnvelopeDto, add: readonly string[], remove: readonly string[]): Promise<void> {
+      const result = await applyTagDelta(supervisor.client, envelope.id, add, remove);
+      messages.patch(restamp(envelope, result.tags));
+    },
+  };
 }
 
 /** A group row carries no folder of its own, so there is nothing on the server to sync. */
@@ -211,6 +287,116 @@ async function syncFolder(
   deps.tree.refresh();
 }
 
+function openFolder(deps: CommandDependencies, target: unknown): void {
+  const scope = folderScope(target);
+  if (scope === undefined) {
+    return;
+  }
+  deps.messages.show(scope);
+  deps.selection.revealMessages();
+}
+
+async function openMessage(deps: CommandDependencies, messageId: unknown): Promise<void> {
+  if (typeof messageId !== "number") {
+    await vscode.window.showInformationMessage(PICK_A_MESSAGE);
+    return;
+  }
+  await deps.reader.open(messageId);
+}
+
+/** A query is scoped to one account: the selected one, or the first the daemon lists. */
+async function searchMail(
+  supervisor: MailcodedDaemonSupervisor,
+  deps: CommandDependencies,
+): Promise<void> {
+  let accountId = deps.selection.accountId();
+  if (accountId === undefined) {
+    let accounts: readonly AccountDto[];
+    try {
+      accounts = await supervisor.client.accountList();
+    } catch (error: unknown) {
+      await offerLog(supervisor, explain(error, { operation: "Reading the account list" }).text, true);
+      return;
+    }
+    accountId = accounts[0]?.id;
+  }
+  if (accountId === undefined) {
+    await vscode.window.showInformationMessage("There are no mail accounts to search yet.");
+    return;
+  }
+
+  const typed = await vscode.window.showInputBox({
+    title: "Search Mail",
+    prompt:
+      "Words, or from: to: subject: tag: is:unread has:attachment before: after:. Searched locally, " +
+      "in relevance order.",
+    placeHolder: "invoice from:acme",
+    ignoreFocusOut: true,
+  });
+  const query = typed?.trim() ?? "";
+  if (query === "") {
+    return;
+  }
+
+  deps.messages.show({ accountId, query });
+  deps.selection.revealMessages();
+}
+
+async function applyTags(
+  supervisor: MailcodedDaemonSupervisor,
+  deps: CommandDependencies,
+  envelope: EnvelopeDto,
+  add: readonly string[],
+  remove: readonly string[],
+  operation: string,
+): Promise<void> {
+  try {
+    await deps.tagger.setTags(envelope, add, remove);
+  } catch (error: unknown) {
+    if (isAuthFailure(error)) {
+      deps.statusBar.setNeedsSignIn(true);
+    }
+    await offerLog(supervisor, explain(error, { operation, accountId: envelope.accountId }).text, true);
+  }
+}
+
+async function changeTags(
+  supervisor: MailcodedDaemonSupervisor,
+  deps: CommandDependencies,
+  node: unknown,
+  add: readonly string[],
+  remove: readonly string[],
+  operation: string,
+): Promise<void> {
+  const envelope = envelopeOf(node, deps);
+  if (envelope === undefined) {
+    await vscode.window.showInformationMessage(PICK_A_MESSAGE);
+    return;
+  }
+  await applyTags(supervisor, deps, envelope, add, remove, operation);
+}
+
+async function toggleFlag(
+  supervisor: MailcodedDaemonSupervisor,
+  deps: CommandDependencies,
+  node: unknown,
+): Promise<void> {
+  const envelope = envelopeOf(node, deps);
+  if (envelope === undefined) {
+    await vscode.window.showInformationMessage(PICK_A_MESSAGE);
+    return;
+  }
+  const flagged = carries(envelope, FlagNames.Flagged);
+  await applyTags(
+    supervisor,
+    deps,
+    envelope,
+    flagged ? [] : [FlagNames.Flagged],
+    flagged ? [FlagNames.Flagged] : [],
+    flagged ? "Clearing the flag" : "Flagging the message",
+  );
+}
+
 /** Every declared command is registered here; a palette entry that answers "command not found"
  * is worse than an absent one, so the manifest and this list are checked against each other. */
 export function registerCommands(
@@ -225,8 +411,22 @@ export function registerCommands(
     vscode.commands.registerCommand(COMMAND_RESTART_DAEMON, () => restartDaemon(supervisor)),
     vscode.commands.registerCommand(COMMAND_REFRESH, () => {
       deps.tree.refresh();
+      deps.messages.refresh();
     }),
     vscode.commands.registerCommand(COMMAND_SYNC, () => syncAccounts(supervisor, deps)),
     vscode.commands.registerCommand(COMMAND_SYNC_FOLDER, (node: unknown) => syncFolder(supervisor, deps, node)),
+    vscode.commands.registerCommand(COMMAND_OPEN_FOLDER, (target: unknown) => {
+      openFolder(deps, target);
+    }),
+    vscode.commands.registerCommand(COMMAND_OPEN_MESSAGE, (messageId: unknown) => openMessage(deps, messageId)),
+    vscode.commands.registerCommand(COMMAND_LOAD_MORE, () => deps.messages.loadMore()),
+    vscode.commands.registerCommand(COMMAND_SEARCH, () => searchMail(supervisor, deps)),
+    vscode.commands.registerCommand(COMMAND_MARK_READ, (node: unknown) =>
+      changeTags(supervisor, deps, node, [], [FlagNames.Unread], "Marking the message read"),
+    ),
+    vscode.commands.registerCommand(COMMAND_MARK_UNREAD, (node: unknown) =>
+      changeTags(supervisor, deps, node, [FlagNames.Unread], [], "Marking the message unread"),
+    ),
+    vscode.commands.registerCommand(COMMAND_TOGGLE_FLAG, (node: unknown) => toggleFlag(supervisor, deps, node)),
   );
 }

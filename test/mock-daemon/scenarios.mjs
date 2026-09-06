@@ -236,7 +236,75 @@ export const TREE_FOLDER_UPDATED = {
   folder: { id: 201, accountId: 2, name: "INBOX", role: "inbox", unread: 13, total: 241 },
 };
 
-function accountsScenario({ accounts = TREE_ACCOUNTS, folders = TREE_FOLDERS, failFor = [], watch = true } = {}) {
+
+/** The message list is specified against the real store: one folder deeper than a page, one empty. */
+export const MESSAGE_COUNTS = { 201: 257, 204: 0 };
+
+export const HOSTILE_SUBJECT = [
+  String.fromCodePoint(0x1b),
+  "[31mPayment",
+  String.fromCodePoint(0x202e),
+  "fdp.exe",
+  String.fromCodePoint(0x200b),
+].join("");
+
+/** Newest first, one minute apart, so date order is unambiguous and every id is distinct. */
+function listEnvelope(folderId, index) {
+  const at = new Date(Date.UTC(2026, 8, 1, 12, 0, 0) - index * 60_000);
+  return {
+    ...ENVELOPE,
+    id: folderId * 1000 + index,
+    accountId: 2,
+    folderId,
+    threadKey: `thread-${String(Math.floor(index / 4))}`,
+    messageId: `list-${String(folderId)}-${String(index)}@example.test`,
+    subject: index === 0 ? HOSTILE_SUBJECT : `Message ${String(index)}`,
+    from: `"Sender ${String(index)}" <sender${String(index)}@example.test>`,
+    date: at.toISOString(),
+    flags: index % 2 === 0 ? ["unread"] : [],
+    tags: index % 2 === 0 ? ["unread"] : [],
+    snippet: null,
+  };
+}
+
+/** The mock's cursor is opaque to the client, which is the only property that matters here. */
+function cursorAt(offset) {
+  return Buffer.from(`offset:${String(offset)}`, "utf8").toString("base64");
+}
+
+function offsetOf(cursor) {
+  if (typeof cursor !== "string" || cursor === "") return 0;
+  const decoded = Buffer.from(cursor, "base64").toString("utf8");
+  const parsed = /^offset:(\d+)$/.exec(decoded);
+  if (parsed === null) throw new Error(`the client sent a cursor it constructed: ${decoded}`);
+  return Number(parsed[1]);
+}
+
+/** A folder browse pages to any depth; a relevance query drops what its offset cap cannot reach. */
+function searchResult(params) {
+  const limit = params?.limit;
+  const query = typeof params?.query === "string" ? params.query.trim() : "";
+  if (query !== "") {
+    return { hits: [listEnvelope(201, 0), listEnvelope(201, 1)], nextCursor: null, truncated: true };
+  }
+
+  const folderId = params?.folderId;
+  const total = MESSAGE_COUNTS[folderId] ?? 0;
+  const from = offsetOf(params?.cursor);
+  const to = Math.min(total, from + limit);
+  const hits = [];
+  for (let index = from; index < to; index += 1) hits.push(listEnvelope(folderId, index));
+  const more = to < total;
+  return { hits, nextCursor: more ? cursorAt(to) : null, truncated: more };
+}
+
+function accountsScenario({
+  accounts = TREE_ACCOUNTS,
+  folders = TREE_FOLDERS,
+  failFor = [],
+  watch = true,
+  searchFails = false,
+} = {}) {
   const failing = new Set(failFor);
   return {
     initializeOptions: { watch },
@@ -263,6 +331,39 @@ function accountsScenario({ accounts = TREE_ACCOUNTS, folders = TREE_FOLDERS, fa
       if (method === "watch.subscribe") {
         ctx.reply(id, {});
         ctx.notify("notify.folder.updated", TREE_FOLDER_UPDATED);
+        return;
+      }
+      if (method === "message.get") {
+        if (params?.format !== "text") {
+          ctx.error(id, -32602, `This mock serves plaintext only; '${String(params?.format)}' was asked for.`, {
+            category: "protocol",
+          });
+          return;
+        }
+        if (params.messageId !== GOLDEN_MESSAGE_GET.envelope.id) {
+          ctx.error(id, 1002, `No message with id ${String(params.messageId)} exists.`, {
+            category: "notFound",
+            requiresUserAction: false,
+          });
+          return;
+        }
+      }
+      if (method === "search") {
+        const limit = params?.limit;
+        if (typeof limit !== "number" || limit < 1) {
+          ctx.error(id, -32602, "This mock refuses an unbounded search: rpc.md \u00a78 requires a limit.", {
+            category: "protocol",
+          });
+          return;
+        }
+        if (searchFails) {
+          ctx.error(id, 1004, "The mail store could not be read.", {
+            category: "storeCorrupt",
+            requiresUserAction: true,
+          });
+          return;
+        }
+        ctx.reply(id, searchResult(params));
         return;
       }
       baseHandle(ctx, request);
@@ -358,6 +459,8 @@ export const SCENARIOS = {
 
   accountsHostileLabels: accountsScenario({ folders: HOSTILE_FOLDERS }),
 
+  /** Every `search` answers 1004: the message list must render empty, never reject. */
+  accountsSearchFails: accountsScenario({ searchFails: true }),
 };
 
 export function scenario(name) {

@@ -98,6 +98,10 @@
         "view": "mailcoded.accounts",
         "contents": "%welcome.failed%",
         "when": "mailcoded.state == 'failed'"
+      },
+      {
+        "view": "mailcoded.messages",
+        "contents": "%view.messages.welcome%"
       }
     ],
     "commands": [
@@ -118,6 +122,46 @@
         "title": "%command.refresh.title%",
         "category": "Mailcoded",
         "icon": "$(refresh)"
+      },
+      {
+        "command": "mailcoded.openFolder",
+        "title": "%command.openFolder.title%",
+        "category": "Mailcoded"
+      },
+      {
+        "command": "mailcoded.openMessage",
+        "title": "%command.openMessage.title%",
+        "category": "Mailcoded"
+      },
+      {
+        "command": "mailcoded.loadMore",
+        "title": "%command.loadMore.title%",
+        "category": "Mailcoded",
+        "icon": "$(ellipsis)"
+      },
+      {
+        "command": "mailcoded.search",
+        "title": "%command.search.title%",
+        "category": "Mailcoded",
+        "icon": "$(search)"
+      },
+      {
+        "command": "mailcoded.markRead",
+        "title": "%command.markRead.title%",
+        "category": "Mailcoded",
+        "icon": "$(mail-read)"
+      },
+      {
+        "command": "mailcoded.markUnread",
+        "title": "%command.markUnread.title%",
+        "category": "Mailcoded",
+        "icon": "$(mail)"
+      },
+      {
+        "command": "mailcoded.toggleFlag",
+        "title": "%command.toggleFlag.title%",
+        "category": "Mailcoded",
+        "icon": "$(star)"
       },
       {
         "command": "mailcoded.showDaemonLog",
@@ -164,6 +208,11 @@
           "command": "mailcoded.restartDaemon",
           "when": "view == mailcoded.accounts",
           "group": "1_daemon@4"
+        },
+        {
+          "command": "mailcoded.search",
+          "when": "view == mailcoded.messages",
+          "group": "navigation@1"
         }
       ],
       "view/item/context": [
@@ -171,11 +220,38 @@
           "command": "mailcoded.syncFolder",
           "when": "view == mailcoded.accounts && viewItem == folder",
           "group": "1_sync@1"
+        },
+        {
+          "command": "mailcoded.markRead",
+          "when": "view == mailcoded.messages && viewItem == message.unread",
+          "group": "1_triage@1"
+        },
+        {
+          "command": "mailcoded.markUnread",
+          "when": "view == mailcoded.messages && viewItem == message.read",
+          "group": "1_triage@1"
+        },
+        {
+          "command": "mailcoded.toggleFlag",
+          "when": "view == mailcoded.messages && (viewItem == message.unread || viewItem == message.read)",
+          "group": "1_triage@2"
         }
       ],
       "commandPalette": [
         {
           "command": "mailcoded.syncFolder",
+          "when": "false"
+        },
+        {
+          "command": "mailcoded.openFolder",
+          "when": "false"
+        },
+        {
+          "command": "mailcoded.openMessage",
+          "when": "false"
+        },
+        {
+          "command": "mailcoded.loadMore",
           "when": "false"
         }
       ]

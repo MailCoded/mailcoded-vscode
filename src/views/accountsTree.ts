@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 
+import { COMMAND_OPEN_FOLDER } from "../commands/index.js";
 import type { MailcodedDaemonSupervisor } from "../daemon/supervisor.js";
 import { RpcError } from "../daemon/types.js";
 import type { DaemonNotification, DaemonStatus, Disposable } from "../daemon/types.js";
@@ -7,7 +8,7 @@ import { buildFolderTree } from "../model/folderTree.js";
 import type { AccountNode, FolderNode } from "../model/folderTree.js";
 import type { AccountDto, FolderDto, RpcMethodName } from "../protocol/index.js";
 
-import { toTreeItem } from "./treeItems.js";
+import { harden, toTreeItem } from "./treeItems.js";
 import type { AccountTreeNode, FolderTreeNode, MailcodedTreeNode } from "./treeItems.js";
 
 export type { AccountTreeNode, FolderTreeNode, MailcodedTreeNode } from "./treeItems.js";
@@ -84,8 +85,18 @@ export class AccountsTreeProvider implements vscode.TreeDataProvider<MailcodedTr
     return unread;
   }
 
+  /** A phantom parent row holds no folder, so there is nothing for it to list. */
   getTreeItem(element: MailcodedTreeNode): vscode.TreeItem {
-    return toTreeItem(element);
+    const item = toTreeItem(element);
+    const folder = element.kind === "folder" ? element.node.folder : undefined;
+    if (folder !== undefined) {
+      item.command = {
+        command: COMMAND_OPEN_FOLDER,
+        title: "Show Messages",
+        arguments: [{ accountId: element.accountId, folderId: folder.id, folderName: harden(folder.name) }],
+      };
+    }
+    return item;
   }
 
   async getChildren(element?: MailcodedTreeNode): Promise<MailcodedTreeNode[]> {
@@ -320,9 +331,14 @@ export class AccountsTreeProvider implements vscode.TreeDataProvider<MailcodedTr
     }
   }
 
-  /** Method and code only: params and results carry mail content and credentials. */
+  /** Method and code only: params and results carry mail content and credentials. A disposed
+   * output channel throws, and reporting an error must never be what rejects getChildren. */
   #log(method: RpcMethodName, error: unknown): void {
     const code = error instanceof RpcError ? String(error.code) : "no code";
-    this.#supervisor.output.appendLine(`Accounts view: ${method} failed (${code})`);
+    try {
+      this.#supervisor.output.appendLine(`Accounts view: ${method} failed (${code})`);
+    } catch {
+      return;
+    }
   }
 }

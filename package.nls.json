@@ -5,6 +5,8 @@
   "viewsContainer.mailcoded.title": "Mail",
   "view.accounts.name": "Accounts",
   "view.messages.name": "Messages",
+  "view.messages.welcome": "Select a folder in Accounts to see its messages.\n[Search mail](command:mailcoded.search)",
+  "command.openFolder.title": "Show Folder Messages",
   "welcome.noAccounts": "Connected to the mailcoded daemon, but it has no mail accounts.\nAdding an account from the editor is not built yet. Run `mailcoded setup` in a terminal, then refresh.\n[Refresh](command:mailcoded.refresh)\n[Restart daemon](command:mailcoded.restartDaemon)",
   "welcome.daemonMissing": "The mailcoded daemon could not be started.\n[Set daemon path](command:workbench.action.openSettings?%5B%22mailcoded.daemonPath%22%5D)\n[Show log](command:mailcoded.showDaemonLog)\nInstall the daemon from the mailcoded engine, or point the setting at the binary you already have.",
   "welcome.protocolMismatch": "The daemon speaks a JSON-RPC protocol version this extension does not understand.\nUpdate whichever of the two is older, then reload. Mailcoded: Show Daemon Info reports both versions.",

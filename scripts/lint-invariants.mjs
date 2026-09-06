@@ -26,6 +26,15 @@ const RULES = [
     message: "confirm tokens belong to src/compose/ and src/protocol/ only",
     allow: (file) => file.startsWith("compose/") || file.startsWith("protocol/"),
   },
+  {
+    pattern: /request\(\s*"search"/,
+    message: "call searchMessages() instead: it is what clamps the limit, and search is never unbounded",
+    allow: (file) => file === "daemon/client.ts",
+  },
+  {
+    pattern: /format:\s*(MessageFormats\.(Html|Raw)|"(html|raw)")/,
+    message: "message.get asks for 'text' only; bodyHtml renders in the sandboxed webview or nowhere",
+  },
 ];
 
 function sourceFiles(root) {

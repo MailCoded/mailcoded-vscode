@@ -56,6 +56,9 @@ interface FakeVscodeState {
   readonly channels: Map<string, string[]>;
   readonly notifications: string[];
   readonly configuration: Map<string, unknown>;
+  readonly contentProviders: Map<string, FakeContentProvider>;
+  readonly shownDocuments: FakeTextDocument[];
+  readonly inputBoxAnswers: (string | undefined)[];
 }
 
 /** The alias resolves for both `import` and `require`, so the module can load twice; the state
@@ -66,6 +69,9 @@ const state: FakeVscodeState = ((): FakeVscodeState => {
     channels: new Map<string, string[]>(),
     notifications: [],
     configuration: new Map<string, unknown>(),
+    contentProviders: new Map<string, FakeContentProvider>(),
+    shownDocuments: [],
+    inputBoxAnswers: [],
   };
   return host.__mailcodedFakeVscode;
 })();
@@ -73,10 +79,18 @@ const state: FakeVscodeState = ((): FakeVscodeState => {
 class Recorder {
   readonly channels = state.channels;
   readonly notifications = state.notifications;
+  readonly shownDocuments = state.shownDocuments;
 
   reset(): void {
     this.channels.clear();
     this.notifications.length = 0;
+    this.shownDocuments.length = 0;
+    state.inputBoxAnswers.length = 0;
+  }
+
+  /** What `window.showInputBox` answers, in order; an exhausted queue answers `undefined`. */
+  answerInputBox(...answers: readonly (string | undefined)[]): void {
+    state.inputBoxAnswers.push(...answers);
   }
 
   lines(name?: string): readonly string[] {
@@ -149,8 +163,91 @@ function showMessage(message: string): Promise<undefined> {
   return Promise.resolve(undefined);
 }
 
+export interface FakeUri {
+  readonly scheme: string;
+  readonly authority: string;
+  readonly path: string;
+  readonly query: string;
+  readonly fragment: string;
+  readonly fsPath: string;
+  toString(): string;
+}
+
+export interface FakeTextDocument {
+  readonly uri: FakeUri;
+  languageId: string;
+  getText(): string;
+}
+
+export interface FakeContentProvider {
+  provideTextDocumentContent(uri: FakeUri): string | Promise<string> | undefined | null;
+}
+
+const URI = /^(?:([A-Za-z][A-Za-z0-9+.-]*):)?(?:\/\/([^/?#]*))?([^?#]*)(?:\?([^#]*))?(?:#(.*))?$/;
+
+function parseUri(value: string, strict = false): FakeUri {
+  const parts = URI.exec(value);
+  const scheme = parts?.[1] ?? "";
+  if (strict && scheme === "") throw new Error(`'${value}' names no scheme`);
+  const path = decodeURIComponent(parts?.[3] ?? "");
+  return {
+    scheme,
+    authority: parts?.[2] ?? "",
+    path,
+    query: parts?.[4] ?? "",
+    fragment: parts?.[5] ?? "",
+    fsPath: path,
+    toString: () => value,
+  };
+}
+
+/** A content provider's document is read-only and re-read on demand, exactly as in the host. */
+async function openTextDocument(uri: FakeUri): Promise<FakeTextDocument> {
+  const provider = state.contentProviders.get(uri.scheme);
+  if (provider === undefined) throw new Error(`No content provider is registered for '${uri.scheme}'`);
+  const text = (await provider.provideTextDocumentContent(uri)) ?? "";
+  return { uri, languageId: "plaintext", getText: () => text };
+}
+
+export interface FakeTreeView<T> extends FakeDisposable {
+  selection: readonly T[];
+  visible: boolean;
+  description: string | undefined;
+  title?: string;
+  badge: { value: number; tooltip: string } | undefined;
+  message?: string;
+  reveal(element: T): Promise<void>;
+  onDidChangeSelection: (listener: (event: { selection: readonly T[] }) => void) => FakeDisposable;
+  onDidChangeVisibility: (listener: (event: { visible: boolean }) => void) => FakeDisposable;
+}
+
+function createTreeView<T>(): FakeTreeView<T> {
+  const selectionChanged = new EventEmitter<{ selection: readonly T[] }>();
+  const visibilityChanged = new EventEmitter<{ visible: boolean }>();
+  return {
+    selection: [],
+    visible: true,
+    description: undefined,
+    badge: undefined,
+    reveal: () => Promise.resolve(),
+    onDidChangeSelection: selectionChanged.event,
+    onDidChangeVisibility: visibilityChanged.event,
+    dispose: () => {
+      selectionChanged.dispose();
+      visibilityChanged.dispose();
+    },
+  };
+}
+
 export const window = {
   createOutputChannel,
+  createTreeView,
+  showInputBox: (): Promise<string | undefined> =>
+    Promise.resolve(state.inputBoxAnswers.length === 0 ? undefined : state.inputBoxAnswers.shift()),
+  showTextDocument: (document: FakeTextDocument): Promise<{ document: FakeTextDocument }> => {
+    state.shownDocuments.push(document);
+    return Promise.resolve({ document });
+  },
   showInformationMessage: showMessage,
   showWarningMessage: showMessage,
   showErrorMessage: showMessage,
@@ -168,6 +265,15 @@ export const window = {
 export const workspace = {
   isTrusted: true,
   workspaceFolders: undefined,
+  openTextDocument,
+  registerTextDocumentContentProvider: (scheme: string, provider: FakeContentProvider): FakeDisposable => {
+    state.contentProviders.set(scheme, provider);
+    return {
+      dispose: () => {
+        state.contentProviders.delete(scheme);
+      },
+    };
+  },
   getConfiguration: (section?: string): FakeConfiguration => new FakeConfiguration(section),
   onDidChangeConfiguration: configurationChanged.event,
   onDidGrantWorkspaceTrust: trustGranted.event,
@@ -185,8 +291,16 @@ export const env = {
 };
 
 export const Uri = {
-  file: (fsPath: string) => ({ fsPath, scheme: "file", path: fsPath, toString: () => `file://${fsPath}` }),
+  parse: parseUri,
+  file: (fsPath: string): FakeUri => parseUri(`file://${fsPath}`),
   joinPath: (base: { fsPath: string }, ...parts: readonly string[]) => Uri.file([base.fsPath, ...parts].join("/")),
+};
+
+export const languages = {
+  setTextDocumentLanguage: (document: FakeTextDocument, languageId: string): Promise<FakeTextDocument> => {
+    document.languageId = languageId;
+    return Promise.resolve(document);
+  },
 };
 
 export const l10n = {
@@ -208,6 +322,7 @@ export const l10n = {
 };
 
 export const ConfigurationTarget = { Global: 1, Workspace: 2, WorkspaceFolder: 3 } as const;
+export const ProgressLocation = { SourceControl: 1, Window: 10, Notification: 15 } as const;
 export const StatusBarAlignment = { Left: 1, Right: 2 } as const;
 export const ExtensionMode = { Production: 1, Development: 2, Test: 3 } as const;
 export const LogLevel = { Off: 0, Trace: 1, Debug: 2, Info: 3, Warning: 4, Error: 5 } as const;

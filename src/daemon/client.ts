@@ -1,16 +1,61 @@
-import { PROTOCOL_VERSION, RpcErrorCode } from "../protocol/index.js";
+import { MessageFormats, PROTOCOL_VERSION, RpcErrorCode } from "../protocol/index.js";
 import type {
   AccountDto,
   CapabilitiesDto,
   FolderDto,
   HealthDto,
+  MessageGetResult,
   RpcMethodMap,
   RpcMethodName,
+  SearchParams,
+  SearchResult,
   StatsDto,
+  TagsSetResult,
 } from "../protocol/index.js";
 
 import { CLIENT_INTERFACE, CLIENT_NAME, RpcError } from "./types.js";
 import type { DaemonConnection, MailcodedClient, RequestOptions } from "./types.js";
+
+const DEFAULT_SEARCH_LIMIT = 50;
+
+/** The three methods the message list needs on top of the negotiated surface every consumer shares. */
+export interface MailcodedMessageClient extends MailcodedClient {
+  search(params: SearchParams): Promise<SearchResult>;
+  messageGet(messageId: number, fetchIfMissing: boolean): Promise<MessageGetResult>;
+  tagsSet(messageId: number, add: readonly string[], remove: readonly string[]): Promise<TagsSetResult>;
+}
+
+/** The daemon clamps silently rather than rejecting, so a client that asks for more is told nothing. */
+function boundedLimit(limit: number | undefined, capability: number): number {
+  const ceiling = Number.isFinite(capability) && capability >= 1 ? Math.floor(capability) : DEFAULT_SEARCH_LIMIT;
+  const wanted = limit === undefined || !Number.isFinite(limit) ? DEFAULT_SEARCH_LIMIT : Math.floor(limit);
+  return Math.min(ceiling, Math.max(1, wanted));
+}
+
+export function searchMessages(client: MailcodedClient, params: SearchParams): Promise<SearchResult> {
+  return client.request("search", {
+    ...params,
+    limit: boundedLimit(params.limit, client.capabilities.maxSearchLimit),
+  });
+}
+
+/** Text only: this reader is a plain document with no sandbox, and `bodyHtml` comes back unsanitized. */
+export function getMessage(
+  client: MailcodedClient,
+  messageId: number,
+  fetchIfMissing: boolean,
+): Promise<MessageGetResult> {
+  return client.request("message.get", { messageId, format: MessageFormats.Text, fetchIfMissing });
+}
+
+export function setTags(
+  client: MailcodedClient,
+  messageId: number,
+  add: readonly string[],
+  remove: readonly string[],
+): Promise<TagsSetResult> {
+  return client.request("tags.set", { messageId, add, remove });
+}
 
 /** The daemon speaks a protocol this build does not: docs/rpc.md §8 says refuse, never guess. */
 export class ProtocolMismatchError extends Error {
@@ -30,7 +75,7 @@ export class ProtocolMismatchError extends Error {
   }
 }
 
-class NegotiatedClient implements MailcodedClient {
+class NegotiatedClient implements MailcodedMessageClient {
   readonly capabilities: CapabilitiesDto;
   readonly daemonVersion: string;
 
@@ -85,6 +130,18 @@ class NegotiatedClient implements MailcodedClient {
     return result.health;
   }
 
+  async search(params: SearchParams): Promise<SearchResult> {
+    return await searchMessages(this, params);
+  }
+
+  async messageGet(messageId: number, fetchIfMissing: boolean): Promise<MessageGetResult> {
+    return await getMessage(this, messageId, fetchIfMissing);
+  }
+
+  async tagsSet(messageId: number, add: readonly string[], remove: readonly string[]): Promise<TagsSetResult> {
+    return await setTags(this, messageId, add, remove);
+  }
+
   /** The daemon answers `{}` before it drains, so the 2 s budget from the timeout table is enough. */
   async shutdown(): Promise<void> {
     await this.request("shutdown", {});
@@ -99,7 +156,7 @@ class NegotiatedClient implements MailcodedClient {
 export async function initializeClient(
   connection: DaemonConnection,
   clientVersion: string,
-): Promise<MailcodedClient> {
+): Promise<MailcodedMessageClient> {
   const result = await connection.request("initialize", {
     clientName: CLIENT_NAME,
     clientVersion,
