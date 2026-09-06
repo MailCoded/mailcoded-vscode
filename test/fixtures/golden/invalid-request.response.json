@@ -1,0 +1,11 @@
+{
+  "error": {
+    "code": -32600,
+    "data": {
+      "category": "protocol"
+    },
+    "message": "Only JSON-RPC 2.0 is supported."
+  },
+  "id": 10,
+  "jsonrpc": "2.0"
+}

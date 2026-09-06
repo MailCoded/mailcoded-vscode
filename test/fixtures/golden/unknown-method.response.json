@@ -1,0 +1,11 @@
+{
+  "error": {
+    "code": -32601,
+    "data": {
+      "category": "unsupported"
+    },
+    "message": "No method named 'message.delete' exists on protocol version 1."
+  },
+  "id": 8,
+  "jsonrpc": "2.0"
+}

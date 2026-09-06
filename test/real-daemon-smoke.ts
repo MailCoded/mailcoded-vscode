@@ -1,0 +1,39 @@
+import { createDaemonSupervisor } from "../src/daemon/supervisor.js";
+
+const DAEMON = process.env["MAILCODED_DAEMON"] ?? "";
+
+async function main(): Promise<void> {
+  const supervisor = createDaemonSupervisor({ extensionPath: process.cwd() });
+  const seen: string[] = [];
+  supervisor.onDidChangeStatus((s) => seen.push(s.state));
+
+  await supervisor.start();
+
+  for (let i = 0; i < 100 && !["ready", "secondary", "failed", "daemonMissing", "protocolMismatch"].includes(supervisor.status.state); i++) {
+    await new Promise((r) => setTimeout(r, 100));
+  }
+
+  const status = supervisor.status;
+  process.stdout.write(`daemon      ${DAEMON}\n`);
+  process.stdout.write(`state       ${status.state}\n`);
+  if (status.state === "ready" || status.state === "secondary") {
+    process.stdout.write(`version     ${status.daemonVersion}\n`);
+    process.stdout.write(`methods     ${status.capabilities.methods.length}\n`);
+    process.stdout.write(`watch       ${String(status.capabilities.watch)}\n`);
+    const accounts = await supervisor.client.accountList();
+    process.stdout.write(`accounts    ${accounts.length}\n`);
+  } else {
+    process.stdout.write(`detail      ${status.detail ?? "(none)"}\n`);
+  }
+  process.stdout.write(`transitions ${seen.join(" -> ")}\n`);
+
+  await supervisor.stop();
+}
+
+main().then(
+  () => process.exit(0),
+  (error: unknown) => {
+    process.stderr.write(`smoke failed: ${String(error)}\n`);
+    process.exit(1);
+  },
+);

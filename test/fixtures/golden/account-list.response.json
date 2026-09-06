@@ -1,0 +1,24 @@
+{
+  "id": 2,
+  "jsonrpc": "2.0",
+  "result": {
+    "accounts": [
+      {
+        "auth": "password",
+        "displayName": "Golden Tester",
+        "email": "golden@example.test",
+        "id": 1,
+        "imap": {
+          "host": "imap.example.test",
+          "port": 993,
+          "security": "sslOnConnect",
+          "username": "golden",
+          "watchFolders": []
+        },
+        "provider": "imap",
+        "quirks": [],
+        "secretRef": "imap:golden@example.test"
+      }
+    ]
+  }
+}

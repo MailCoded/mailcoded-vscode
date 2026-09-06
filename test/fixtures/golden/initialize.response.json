@@ -1,0 +1,50 @@
+{
+  "id": 1,
+  "jsonrpc": "2.0",
+  "result": {
+    "capabilities": {
+      "attachments": true,
+      "htmlBodies": true,
+      "maxSearchLimit": 200,
+      "methods": [
+        "initialize",
+        "secret.set",
+        "account.add",
+        "account.list",
+        "folder.list",
+        "sync",
+        "search",
+        "thread.get",
+        "message.get",
+        "attachment.get",
+        "tags.set",
+        "message.move",
+        "send.preview",
+        "send",
+        "watch.subscribe",
+        "stats",
+        "health",
+        "account.test",
+        "outbox.list",
+        "provider.detect",
+        "shutdown"
+      ],
+      "notifications": [
+        "notify.mail.added",
+        "notify.folder.updated",
+        "notify.sync.error"
+      ],
+      "providers": [
+        "imap"
+      ],
+      "rawSql": false,
+      "search": true,
+      "secretBackend": "<normalized>",
+      "send": true,
+      "threading": true,
+      "watch": true
+    },
+    "daemonVersion": "0.0.0-transcript",
+    "protocolVersion": 1
+  }
+}

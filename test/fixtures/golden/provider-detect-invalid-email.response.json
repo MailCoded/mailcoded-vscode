@@ -1,0 +1,11 @@
+{
+  "error": {
+    "code": -32602,
+    "data": {
+      "category": "protocol"
+    },
+    "message": "email is not a valid address."
+  },
+  "id": 23,
+  "jsonrpc": "2.0"
+}

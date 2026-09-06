@@ -1,0 +1,12 @@
+{
+  "error": {
+    "code": 1002,
+    "data": {
+      "category": "notFound",
+      "requiresUserAction": false
+    },
+    "message": "No message with id 999."
+  },
+  "id": 6,
+  "jsonrpc": "2.0"
+}

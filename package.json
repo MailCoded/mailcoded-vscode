@@ -560,6 +560,7 @@
     "test:unit": "mocha --import tsx \"test/unit/**/*.test.ts\"",
     "test:sanitize": "mocha --import tsx \"test/sanitize/**/*.test.ts\"",
     "test:e2e": "node test/e2e/runTest.js",
+    "smoke:daemon": "tsx --import ./test/mock-daemon/vscodeAlias.mjs test/real-daemon-smoke.ts",
     "package": "vsce package --no-dependencies",
     "sync:protocol": "node scripts/sync-protocol.mjs"
   },

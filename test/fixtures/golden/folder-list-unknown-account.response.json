@@ -1,0 +1,12 @@
+{
+  "error": {
+    "code": 1002,
+    "data": {
+      "category": "notFound",
+      "requiresUserAction": false
+    },
+    "message": "No account with id 999."
+  },
+  "id": 3,
+  "jsonrpc": "2.0"
+}

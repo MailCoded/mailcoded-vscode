@@ -1,0 +1,25 @@
+{
+  "id": 22,
+  "jsonrpc": "2.0",
+  "result": {
+    "preset": {
+      "advice": "This provider is not in the built-in list, so the hosts below are a guess from the domain name. Check them against your provider's IMAP documentation.",
+      "credential": "password",
+      "displayName": "example.test",
+      "imap": {
+        "host": "imap.example.test",
+        "port": 993,
+        "security": "sslOnConnect",
+        "username": "someone@example.test",
+        "watchFolders": []
+      },
+      "isGuess": true,
+      "smtp": {
+        "host": "smtp.example.test",
+        "port": 587,
+        "security": "startTls",
+        "username": "someone@example.test"
+      }
+    }
+  }
+}

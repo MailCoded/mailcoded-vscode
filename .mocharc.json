@@ -1,0 +1,6 @@
+{
+  "recursive": true,
+  "timeout": 10000,
+  "slow": 2500,
+  "node-option": ["import=tsx", "import=./test/mock-daemon/vscodeAlias.mjs", "no-warnings"]
+}

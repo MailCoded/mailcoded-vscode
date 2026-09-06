@@ -1,0 +1,11 @@
+{
+  "error": {
+    "code": -32700,
+    "data": {
+      "category": "protocol"
+    },
+    "message": "The request body was not valid JSON."
+  },
+  "id": null,
+  "jsonrpc": "2.0"
+}

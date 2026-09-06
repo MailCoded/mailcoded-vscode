@@ -1,0 +1,12 @@
+{
+  "error": {
+    "code": 1003,
+    "data": {
+      "category": "protocol",
+      "requiresUserAction": true
+    },
+    "message": "A valid one-time confirm token from send.preview is required before a message is sent."
+  },
+  "id": 7,
+  "jsonrpc": "2.0"
+}
