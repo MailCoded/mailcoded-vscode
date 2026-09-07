@@ -42,8 +42,7 @@ body {
 #${ShellElementIds.Toolbar}:empty,
 #${ShellElementIds.Banner}:empty,
 #${ShellElementIds.Header}:empty,
-#${ShellElementIds.Attachments}:empty,
-#${ShellElementIds.Body}:empty {
+#${ShellElementIds.Attachments}:empty {
   display: none;
 }
 `.trim();

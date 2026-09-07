@@ -404,7 +404,8 @@
     "test:e2e": "node test/e2e/runTest.js",
     "smoke:daemon": "tsx --import ./test/mock-daemon/vscodeAlias.mjs test/real-daemon-smoke.ts",
     "package": "vsce package --no-dependencies",
-    "sync:protocol": "node scripts/sync-protocol.mjs"
+    "sync:protocol": "node scripts/sync-protocol.mjs",
+    "smoke:webview": "tsx test/webview-smoke.ts"
   },
   "dependencies": {
     "dompurify": "^3.4.14",

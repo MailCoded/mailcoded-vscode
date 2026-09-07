@@ -6,7 +6,7 @@ import {
   parseWebviewMessage,
   toOrigin,
 } from "../../src/reader/protocol.js";
-import { buildCsp, buildShell, createNonce } from "../../src/reader/shell.js";
+import { READER_STYLES, buildCsp, buildShell, createNonce } from "../../src/reader/shell.js";
 
 const NONCE = "NONCESENTINELnoncesentinel0";
 const CSP_SOURCE = "vscode-webview://cspsourcesentinel";
@@ -270,6 +270,17 @@ describe("buildShell", () => {
         }),
       /allowed image origin/,
     );
+  });
+});
+
+describe("READER_STYLES", () => {
+  it("never hides the body container for being empty: its content lives in a shadow root", () => {
+    for (const rule of READER_STYLES.split("}")) {
+      const [selectors = "", declarations = ""] = rule.split("{");
+      if (/mc-body[^,]*:empty/.test(selectors)) {
+        assert.doesNotMatch(declarations, /display\s*:\s*none/, rule);
+      }
+    }
   });
 });
 

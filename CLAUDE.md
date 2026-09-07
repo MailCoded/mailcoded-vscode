@@ -30,6 +30,7 @@ npm run license-check     # fails if the shipped dependency set changes
 npm run test:unit
 npm run test:sanitize     # jsdom; the DOMPurify and CSP tests
 npm run test:e2e          # downloads a VS Code build and drives it
+npm run smoke:webview     # drives the built webview bundle in a local headless Chromium under the real CSP
 npm run package           # vsce package --no-dependencies -- builds a VSIX, publishes nothing
 npm run sync:protocol     # vendor the engine's generated protocol types
 ```
