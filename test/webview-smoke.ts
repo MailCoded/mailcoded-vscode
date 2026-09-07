@@ -301,7 +301,7 @@ function main(): number {
   const nonce = createNonce();
   const shell = buildShell({
     nonce,
-    cspSource: "vscode-webview://smoke",
+    cspSource: "'self' https://*.vscode-cdn.net",
     scriptUri: PLACEHOLDER_SCRIPT,
     styles: READER_STYLES,
   });

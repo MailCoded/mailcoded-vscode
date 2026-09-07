@@ -6,7 +6,7 @@ import {
   parseWebviewMessage,
   toOrigin,
 } from "../../src/reader/protocol.js";
-import { READER_STYLES, buildCsp, buildShell, createNonce } from "../../src/reader/shell.js";
+import { READER_STYLES, buildCsp, buildShell, createNonce, isCspSourceList } from "../../src/reader/shell.js";
 
 const NONCE = "NONCESENTINELnoncesentinel0";
 const CSP_SOURCE = "vscode-webview://cspsourcesentinel";
@@ -270,6 +270,69 @@ describe("buildShell", () => {
         }),
       /allowed image origin/,
     );
+  });
+});
+
+/** Read out of the installed VS Code server bundle: `cI = \`'self' https://*.${"vscode-cdn.net"}\``, and
+ * `asWebviewUri` maps `file:` through `vscode-remote` onto `<scheme>+<authority>.vscode-resource.vscode-cdn.net`. */
+const REAL_CSP_SOURCE = "'self' https://*.vscode-cdn.net";
+const REAL_WEB_CSP_SOURCE = "https://example.com/extensions/mailcoded/ 'self' https://*.vscode-cdn.net";
+const REAL_REMOTE_SCRIPT_URI =
+  "https://vscode-remote+wsl-002bubuntu.vscode-resource.vscode-cdn.net/home/lin/works/mailcoded/mailcoded-vscode/dist/webview/main.js";
+const REAL_LOCAL_SCRIPT_URI =
+  "https://file+.vscode-resource.vscode-cdn.net/home/lin/works/mailcoded/mailcoded-vscode/dist/webview/main.js";
+
+describe("the cspSource VS Code really passes", () => {
+  it("is a source list with a quoted keyword and a space, and lands in style-src verbatim", () => {
+    assert.equal(
+      buildCsp(NONCE, REAL_CSP_SOURCE, []),
+      "default-src 'none'; style-src 'self' https://*.vscode-cdn.net 'unsafe-inline'; " +
+        "script-src 'nonce-NONCESENTINELnoncesentinel0'; img-src data:;",
+    );
+  });
+
+  it("accepts the web-hosted form, which prepends the extension's own https location", () => {
+    assert.ok(isCspSourceList(REAL_WEB_CSP_SOURCE));
+    assert.equal(directive(buildCsp(NONCE, REAL_WEB_CSP_SOURCE, []), "style-src").length, 4);
+  });
+
+  it("accepts the legacy scheme sources older hosts returned", () => {
+    for (const source of ["vscode-webview-resource:", "vscode-resource:", "vscode-webview://cspsourcesentinel"]) {
+      assert.ok(isCspSourceList(source), source);
+    }
+  });
+
+  it("still rejects anything that could end or widen the directive", () => {
+    for (const source of [
+      "'self' https://*.vscode-cdn.net; script-src *",
+      "'unsafe-inline'",
+      "'self' 'unsafe-eval'",
+      "'self' https://*.vscode-cdn.net 'unsafe-inline'",
+      "*",
+      "https://*",
+      "data:",
+      "blob:",
+      "'self' javascript:",
+      "'self'  https://*.vscode-cdn.net",
+      "'self'\nhttps://*.vscode-cdn.net",
+      "'self'\thttps://*.vscode-cdn.net",
+      " 'self'",
+      "'self' ",
+      "",
+      `https://${"a".repeat(600)}.example`,
+      "'self' https://a.example https://b.example https://c.example https://d.example",
+    ]) {
+      assert.ok(!isCspSourceList(source), JSON.stringify(source));
+      assert.throws(() => buildCsp(NONCE, source, []), JSON.stringify(source));
+    }
+  });
+
+  it("builds the shell for the remote and the local resource URIs a real host produces", () => {
+    for (const scriptUri of [REAL_REMOTE_SCRIPT_URI, REAL_LOCAL_SCRIPT_URI]) {
+      const html = buildShell({ nonce: NONCE, cspSource: REAL_CSP_SOURCE, scriptUri, styles: STYLES });
+      assert.ok(html.includes(`<script nonce="${NONCE}" src="${scriptUri}"></script>`), scriptUri);
+      assert.ok(html.includes(`content="${buildCsp(NONCE, REAL_CSP_SOURCE, [])}"`));
+    }
   });
 });
 

@@ -55,6 +55,7 @@ const HTML_FAILED = "The HTML part could not be loaded; showing the plaintext.";
 const NOTHING_TO_ALLOW = "No image origin in this message could be allowed.";
 const LOADING_HTML = "Loading the HTML part…";
 const WRITE_FAILED = "The attachment could not be written to that location.";
+const SHELL_FAILED = "The mail reader could not be shown in this VS Code; opening the message as plain text.";
 
 /** `https://host` or `https://host:port`, and nothing else: no path, no userinfo, no wildcard.
  * These are the only strings that may ever widen the image policy of a single render. */
@@ -236,7 +237,9 @@ class ReaderWebviewPanel implements ReaderPanel {
     if (cached !== undefined) {
       panel.title = title(cached.envelope);
       panel.reveal(panel.viewColumn, true);
-      this.#post(cached.text);
+      if (!(await this.#show(messageId, cached.text))) {
+        return;
+      }
       await this.#upgrade(messageId);
       return;
     }
@@ -267,10 +270,12 @@ class ReaderWebviewPanel implements ReaderPanel {
     this.#remember(messageId, { envelope: message.envelope, text });
     panel.title = title(message.envelope);
     panel.reveal(panel.viewColumn, true);
-    this.#post(text);
+    const shown = await this.#show(messageId, text);
 
     await markMessageRead(this.#supervisor, this.#tagger, READER_LABEL, message.envelope);
-    await this.#upgrade(messageId);
+    if (shown) {
+      await this.#upgrade(messageId);
+    }
   }
 
   async showHtml(): Promise<void> {
@@ -295,7 +300,7 @@ class ReaderWebviewPanel implements ReaderPanel {
       await this.open(messageId);
       return;
     }
-    this.#post(cached.text);
+    await this.#show(messageId, cached.text);
   }
 
   dispose(): void {
@@ -316,6 +321,21 @@ class ReaderWebviewPanel implements ReaderPanel {
     return vscode.workspace.getConfiguration(CONFIG_SECTION).get("readerDefault") === "html"
       ? "html"
       : "text";
+  }
+
+  /** A frame that cannot be shown here must not vanish: the panel is closed and the same message
+   * opens in the plaintext document reader, with a warning that names the log. */
+  async #show(messageId: number, render: RenderFrame): Promise<boolean> {
+    if (this.#post(render)) {
+      return true;
+    }
+    this.#panel?.dispose();
+    this.#panel = undefined;
+    this.#forget();
+    this.#note("the reader shell could not be built for this host; opened the plaintext reader instead");
+    void vscode.window.showWarningMessage(SHELL_FAILED);
+    await this.#fallback.open(messageId);
+    return false;
   }
 
   async #upgrade(messageId: number): Promise<void> {
@@ -436,16 +456,16 @@ class ReaderWebviewPanel implements ReaderPanel {
     this.#blocked.clear();
   }
 
-  #post(render: RenderFrame): void {
+  #post(render: RenderFrame): boolean {
     const panel = this.#ensurePanel();
     if (panel === undefined) {
-      return;
+      return false;
     }
 
     const key = policyKey(render.allowedOrigins);
     if (key !== this.#loadedPolicyKey) {
       if (!this.#load(panel, render.allowedOrigins)) {
-        return;
+        return false;
       }
       this.#loadedPolicyKey = key;
     }
@@ -453,9 +473,10 @@ class ReaderWebviewPanel implements ReaderPanel {
     this.#current = render;
     if (this.#ready) {
       void panel.webview.postMessage(render);
-      return;
+      return true;
     }
     this.#pending = render;
+    return true;
   }
 
   /** A reload is what swaps the policy, so it gets a fresh nonce, and the frame is re-posted once
@@ -506,11 +527,12 @@ class ReaderWebviewPanel implements ReaderPanel {
 
     switch (message.type) {
       case "ready": {
+        // A hidden panel drops its document; the re-created one says ready again and needs the frame back.
         this.#ready = true;
-        const pending = this.#pending;
+        const frame = this.#pending ?? this.#current;
         this.#pending = undefined;
-        if (pending !== undefined) {
-          void this.#panel?.webview.postMessage(pending);
+        if (frame !== undefined) {
+          void this.#panel?.webview.postMessage(frame);
         }
         return;
       }

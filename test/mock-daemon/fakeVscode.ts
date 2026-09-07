@@ -59,7 +59,14 @@ interface FakeVscodeState {
   readonly contentProviders: Map<string, FakeContentProvider>;
   readonly shownDocuments: FakeTextDocument[];
   readonly inputBoxAnswers: (string | undefined)[];
+  readonly webviewPanels: FakeWebviewPanel[];
+  webviewCspSource: string;
 }
+
+/** Exactly what a Remote-WSL extension host returns: `cspSource` is a source list, and
+ * `asWebviewUri` maps a file: URI onto the vscode-cdn.net resource authority. */
+export const REAL_WEBVIEW_CSP_SOURCE = "'self' https://*.vscode-cdn.net";
+export const REAL_WEBVIEW_RESOURCE_AUTHORITY = "vscode-remote+wsl-002bubuntu.vscode-resource.vscode-cdn.net";
 
 /** The alias resolves for both `import` and `require`, so the module can load twice; the state
  * it records must not. */
@@ -72,6 +79,8 @@ const state: FakeVscodeState = ((): FakeVscodeState => {
     contentProviders: new Map<string, FakeContentProvider>(),
     shownDocuments: [],
     inputBoxAnswers: [],
+    webviewPanels: [],
+    webviewCspSource: REAL_WEBVIEW_CSP_SOURCE,
   };
   return host.__mailcodedFakeVscode;
 })();
@@ -80,12 +89,20 @@ class Recorder {
   readonly channels = state.channels;
   readonly notifications = state.notifications;
   readonly shownDocuments = state.shownDocuments;
+  readonly webviewPanels = state.webviewPanels;
 
   reset(): void {
     this.channels.clear();
     this.notifications.length = 0;
     this.shownDocuments.length = 0;
     state.inputBoxAnswers.length = 0;
+    this.webviewPanels.length = 0;
+    state.webviewCspSource = REAL_WEBVIEW_CSP_SOURCE;
+  }
+
+  /** What `webview.cspSource` answers from here on; `reset()` restores the real value. */
+  setWebviewCspSource(value: string): void {
+    state.webviewCspSource = value;
   }
 
   /** What `window.showInputBox` answers, in order; an exhausted queue answers `undefined`. */
@@ -239,9 +256,83 @@ function createTreeView<T>(): FakeTreeView<T> {
   };
 }
 
+export interface FakeWebviewPanel extends FakeDisposable {
+  readonly viewType: string;
+  title: string;
+  readonly viewColumn: number;
+  readonly visible: boolean;
+  readonly active: boolean;
+  readonly options: unknown;
+  readonly webview: {
+    html: string;
+    readonly cspSource: string;
+    readonly options: unknown;
+    asWebviewUri(uri: FakeUri): FakeUri;
+    postMessage(message: unknown): Promise<boolean>;
+    onDidReceiveMessage(listener: (message: unknown) => void): FakeDisposable;
+  };
+  readonly posted: unknown[];
+  readonly disposed: boolean;
+  /** Simulates a message from the webview's script, as `acquireVsCodeApi().postMessage` would send. */
+  receive(message: unknown): void;
+  reveal(viewColumn?: number, preserveFocus?: boolean): void;
+  onDidDispose(listener: () => void): FakeDisposable;
+  onDidChangeViewState(listener: (event: { webviewPanel: FakeWebviewPanel }) => void): FakeDisposable;
+}
+
+function createWebviewPanel(viewType: string, title: string, viewColumn: number, options: unknown): FakeWebviewPanel {
+  const received = new EventEmitter<unknown>();
+  const disposedEvent = new EventEmitter<void>();
+  const viewState = new EventEmitter<{ webviewPanel: FakeWebviewPanel }>();
+  const posted: unknown[] = [];
+  let disposed = false;
+  const panel: FakeWebviewPanel = {
+    viewType,
+    title,
+    viewColumn,
+    visible: true,
+    active: true,
+    options,
+    webview: {
+      html: "",
+      get cspSource(): string {
+        return state.webviewCspSource;
+      },
+      options,
+      asWebviewUri: (uri: FakeUri): FakeUri => parseUri(`https://${REAL_WEBVIEW_RESOURCE_AUTHORITY}${uri.path}`),
+      postMessage: (message: unknown): Promise<boolean> => {
+        if (disposed) throw new Error("Webview is disposed");
+        posted.push(message);
+        return Promise.resolve(true);
+      },
+      onDidReceiveMessage: received.event,
+    },
+    posted,
+    get disposed(): boolean {
+      return disposed;
+    },
+    receive: (message: unknown): void => {
+      received.fire(message);
+    },
+    reveal: (): void => undefined,
+    onDidDispose: (listener: () => void): FakeDisposable => disposedEvent.event(listener),
+    onDidChangeViewState: viewState.event,
+    dispose: (): void => {
+      if (disposed) return;
+      disposed = true;
+      disposedEvent.fire();
+      received.dispose();
+      viewState.dispose();
+    },
+  };
+  state.webviewPanels.push(panel);
+  return panel;
+}
+
 export const window = {
   createOutputChannel,
   createTreeView,
+  createWebviewPanel,
   showInputBox: (): Promise<string | undefined> =>
     Promise.resolve(state.inputBoxAnswers.length === 0 ? undefined : state.inputBoxAnswers.shift()),
   showTextDocument: (document: FakeTextDocument): Promise<{ document: FakeTextDocument }> => {
@@ -322,6 +413,7 @@ export const l10n = {
 };
 
 export const ConfigurationTarget = { Global: 1, Workspace: 2, WorkspaceFolder: 3 } as const;
+export const ViewColumn = { Active: -1, Beside: -2, One: 1, Two: 2, Three: 3 } as const;
 export const ProgressLocation = { SourceControl: 1, Window: 10, Notification: 15 } as const;
 export const StatusBarAlignment = { Left: 1, Right: 2 } as const;
 export const ExtensionMode = { Production: 1, Development: 2, Test: 3 } as const;

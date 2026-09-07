@@ -4,7 +4,14 @@ import { MAX_IMAGE_ORIGINS, ShellElementIds, isImageOrigin } from "./protocol.js
 
 const NONCE_BYTES = 16;
 const NONCE = /^[A-Za-z0-9_-]{22,64}$/;
-const CSP_SOURCE = /^[A-Za-z0-9:/*._-]{1,256}$/;
+/** What `webview.cspSource` really is: a space-separated source list. On desktop and in a remote
+ * host it is `'self' https://*.vscode-cdn.net`; a web-hosted extension gets its own https location
+ * prepended. One token per alternative here; nothing that could end the directive gets through. */
+const CSP_SOURCE_TOKEN =
+  /^(?:'self'|[A-Za-z][A-Za-z0-9+.-]*:|[A-Za-z][A-Za-z0-9+.-]*:\/\/(?:\*\.)?[A-Za-z0-9._-]+(?::\d{1,5})?(?:\/[A-Za-z0-9._~%/-]*)?)$/;
+const CSP_SOURCE_DENIED = /^(?:data|blob|filesystem|javascript|about):|^'unsafe/i;
+const CSP_SOURCE_MAX_TOKENS = 4;
+const CSP_SOURCE_MAX_LENGTH = 512;
 const SCRIPT_URI =
   /^(?:https|vscode-webview|vscode-webview-resource|vscode-resource|vscode-file):\/\/[A-Za-z0-9._~:/?#@!$()*+,;=%[\]-]{1,2048}$/;
 const STYLE_BREAKOUT = /<\/|<!--/;
@@ -57,8 +64,8 @@ export function buildCsp(nonce: string, cspSource: string, allowedOrigins: reado
   if (!NONCE.test(nonce)) {
     throw new Error("The CSP nonce must be base64url and at least 128 bits wide.");
   }
-  if (!CSP_SOURCE.test(cspSource)) {
-    throw new Error("The webview CSP source is not a bare source expression.");
+  if (!isCspSourceList(cspSource)) {
+    throw new Error("The webview CSP source is not a plain source list.");
   }
   return (
     `default-src 'none'; style-src ${cspSource} 'unsafe-inline'; ` +
@@ -99,6 +106,17 @@ export function buildShell(options: ShellOptions): string {
     "</html>",
     "",
   ].join("\n");
+}
+
+export function isCspSourceList(value: string): boolean {
+  if (value.length === 0 || value.length > CSP_SOURCE_MAX_LENGTH) {
+    return false;
+  }
+  const tokens = value.split(" ");
+  return (
+    tokens.length <= CSP_SOURCE_MAX_TOKENS &&
+    tokens.every((token) => CSP_SOURCE_TOKEN.test(token) && !CSP_SOURCE_DENIED.test(token))
+  );
 }
 
 function imageSources(allowedOrigins: readonly string[]): string {
