@@ -8,6 +8,10 @@ const REPO_ROOT = fileURLToPath(new URL("..", import.meta.url));
 const SRC = path.join(REPO_ROOT, "src");
 const EXTENSIONS = new Set([".ts", ".tsx", ".mts", ".cts", ".js", ".mjs", ".cjs"]);
 
+const HTML_ACCESSOR_FILE = "daemon/client.ts";
+const HTML_ACCESSOR = "getMessageHtmlForWebview";
+const CSP_FILE = "reader/shell.ts";
+
 const RULES = [
   {
     pattern: /window\.createTerminal/,
@@ -32,8 +36,20 @@ const RULES = [
     allow: (file) => file === "daemon/client.ts",
   },
   {
-    pattern: /format:\s*(MessageFormats\.(Html|Raw)|"(html|raw)")/,
-    message: "message.get asks for 'text' only; bodyHtml renders in the sandboxed webview or nowhere",
+    pattern: /format:\s*(MessageFormats\.Raw|"raw")/,
+    message: "nothing in this client asks message.get for 'raw'",
+  },
+  {
+    pattern: /MessageFormats\.Html|format:\s*"html"/,
+    message:
+      "message.get asks for 'text' everywhere but getMessageHtmlForWebview() in src/daemon/client.ts; " +
+      "bodyHtml renders in the sandboxed webview or nowhere",
+    allow: (file) => file === HTML_ACCESSOR_FILE,
+  },
+  {
+    pattern: /default-src|img-src/,
+    message: "the CSP is written once, in src/reader/shell.ts (engine SPEC.md 6.3); a second one would not be reviewed",
+    allow: (file) => file === CSP_FILE,
   },
 ];
 
@@ -66,6 +82,23 @@ for (const file of files) {
   }
 }
 
+
+// 'html' is allowed at exactly one call site. A second mention in the same file would be a second,
+// possibly unsandboxed, path to raw bodyHtml, which the file-level allowance above cannot see.
+const accessorFile = files.includes(HTML_ACCESSOR_FILE)
+  ? readFileSync(path.join(SRC, HTML_ACCESSOR_FILE), "utf8")
+  : "";
+const htmlSites = [...accessorFile.matchAll(/MessageFormats\.Html|format:\s*"html"/g)].length;
+if (htmlSites > 1) {
+  violations.push(
+    `src/${HTML_ACCESSOR_FILE}: ${htmlSites} call sites ask message.get for 'html'; exactly one, ${HTML_ACCESSOR}(), is permitted`,
+  );
+}
+if (htmlSites === 1 && !new RegExp(`${HTML_ACCESSOR}[\\s\\S]{0,400}?MessageFormats\\.Html`).test(accessorFile)) {
+  violations.push(
+    `src/${HTML_ACCESSOR_FILE}: the 'html' request is not inside ${HTML_ACCESSOR}(), the only accessor the webview path may reach`,
+  );
+}
 
 // A command declared in the manifest is invokable from the palette, so one without a
 // registerCommand call fails at the click with "command not found".

@@ -1,0 +1,7 @@
+{
+  "spec": ["test/sanitize/**/*.test.ts"],
+  "recursive": true,
+  "timeout": 20000,
+  "slow": 2500,
+  "node-option": ["import=tsx", "no-warnings"]
+}

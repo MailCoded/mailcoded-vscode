@@ -9,6 +9,8 @@ import { ContextKeys } from "./context.js";
 import { hardenLine } from "./model/messageFormat.js";
 import type { EnvelopeDto } from "./protocol/index.js";
 import { createMessageReader } from "./reader/messageDocument.js";
+import { createReaderPanel } from "./reader/readerPanel.js";
+import type { ReaderPanel } from "./reader/readerPanel.js";
 import { ACCOUNTS_VIEW_ID, AccountsTreeProvider } from "./views/accountsTree.js";
 import type { MailcodedTreeNode } from "./views/accountsTree.js";
 import { MESSAGES_VIEW_ID, MessagesTreeProvider } from "./views/messagesTree.js";
@@ -21,6 +23,7 @@ export interface MailcodedApi {
     readonly contextKeys: ContextKeys;
     readonly tree: AccountsTreeProvider;
     readonly messages: MessagesTreeProvider;
+    readonly readerPanel: ReaderPanel;
   };
 }
 
@@ -98,6 +101,7 @@ export function activate(context: vscode.ExtensionContext): MailcodedApi {
   });
   const tagger = createMessageTagger(supervisor, messages);
   const reader = createMessageReader(supervisor, tagger);
+  const readerPanel = createReaderPanel(supervisor, context.extensionUri, tagger, reader);
   const statusBar = createStatusBar(supervisor);
   const badge = (): void => {
     void updateBadge(view, tree);
@@ -113,7 +117,7 @@ export function activate(context: vscode.ExtensionContext): MailcodedApi {
     },
   };
 
-  context.subscriptions.push(supervisor, keys, tree, view, messages, messagesView, reader, statusBar);
+  context.subscriptions.push(supervisor, keys, tree, view, messages, messagesView, reader, readerPanel, statusBar);
   context.subscriptions.push(tree.onDidChangeTreeData(badge));
   context.subscriptions.push(
     messages.onDidChangeTreeData(() => {
@@ -129,14 +133,14 @@ export function activate(context: vscode.ExtensionContext): MailcodedApi {
     }),
   );
   context.subscriptions.push(
-    registerCommands(supervisor, { tree, statusBar, messages, reader, tagger, selection }),
+    registerCommands(supervisor, { tree, statusBar, messages, reader, readerPanel, tagger, selection }),
   );
 
   // Activation must not wait on a spawn or a handshake; the status event reports the outcome.
   void supervisor.start();
 
   return process.env["MAILCODED_TEST"] === "1"
-    ? { supervisor, _test: { contextKeys: keys, tree, messages } }
+    ? { supervisor, _test: { contextKeys: keys, tree, messages, readerPanel } }
     : { supervisor };
 }
 

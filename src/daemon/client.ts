@@ -48,6 +48,16 @@ export function getMessage(
   return client.request("message.get", { messageId, format: MessageFormats.Text, fetchIfMissing });
 }
 
+/** The sandboxed reader webview only. `bodyHtml` comes back raw (docs/rpc.md §4): DOMPurify runs
+ * inside the webview, under the CSP in SPEC §6.3, and nothing else may call this. */
+export function getMessageHtmlForWebview(
+  client: MailcodedClient,
+  messageId: number,
+  fetchIfMissing: boolean,
+): Promise<MessageGetResult> {
+  return client.request("message.get", { messageId, format: MessageFormats.Html, fetchIfMissing });
+}
+
 export function setTags(
   client: MailcodedClient,
   messageId: number,

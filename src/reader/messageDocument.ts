@@ -12,6 +12,7 @@ import type { EnvelopeDto, MessageGetResult, RpcMethodName } from "../protocol/i
 export const MESSAGE_SCHEME = "mailcoded-message";
 
 const PLAINTEXT_LANGUAGE_ID = "plaintext";
+const READER_LABEL = "Message reader";
 const SLUG_MAX = 60;
 const SLUG_KEEP = /[\p{L}\p{N} ._-]/u;
 const CACHED_MESSAGES = 20;
@@ -50,6 +51,40 @@ export function messageIdOf(uri: vscode.Uri): number | undefined {
 
 function isUnread(envelope: EnvelopeDto): boolean {
   return envelope.flags.includes(FlagNames.Unread) || envelope.tags.includes(FlagNames.Unread);
+}
+
+/** Method and code only: params and results carry mail content, and a credential on other
+ * methods. A disposed output channel throws, and reporting a failure must never be what fails. */
+export function logReaderFailure(
+  supervisor: MailcodedDaemonSupervisor,
+  reader: string,
+  method: RpcMethodName,
+  error: unknown,
+): void {
+  const code = error instanceof RpcError ? String(error.code) : "no code";
+  try {
+    supervisor.output.appendLine(`${reader}: ${method} failed (${code})`);
+  } catch {
+    return;
+  }
+}
+
+/** The message is open either way, so a failed tag write is logged, not raised at the reader.
+ * Shared so the plaintext document and the HTML panel mark a message read identically. */
+export async function markMessageRead(
+  supervisor: MailcodedDaemonSupervisor,
+  tagger: MessageTagger,
+  reader: string,
+  envelope: EnvelopeDto,
+): Promise<void> {
+  if (!readConfiguration().markReadOnOpen || !isUnread(envelope)) {
+    return;
+  }
+  try {
+    await tagger.setTags(envelope, [], [FlagNames.Unread]);
+  } catch (error: unknown) {
+    logReaderFailure(supervisor, reader, "tags.set", error);
+  }
 }
 
 /** A read-only plaintext document: a content provider's document is never editable, and this
@@ -120,27 +155,12 @@ class MessageDocuments implements vscode.TextDocumentContentProvider, MessageRea
     }
   }
 
-  /** The message is open either way, so a failed tag write is logged, not raised at the reader. */
   async #markRead(envelope: EnvelopeDto): Promise<void> {
-    if (!readConfiguration().markReadOnOpen || !isUnread(envelope)) {
-      return;
-    }
-    try {
-      await this.#tagger.setTags(envelope, [], [FlagNames.Unread]);
-    } catch (error: unknown) {
-      this.#log("tags.set", error);
-    }
+    await markMessageRead(this.#supervisor, this.#tagger, READER_LABEL, envelope);
   }
 
-  /** Method and code only: params and results carry mail content. A disposed output channel
-   * throws, and reporting a failure must never be what fails. */
   #log(method: RpcMethodName, error: unknown): void {
-    const code = error instanceof RpcError ? String(error.code) : "no code";
-    try {
-      this.#supervisor.output.appendLine(`Message reader: ${method} failed (${code})`);
-    } catch {
-      return;
-    }
+    logReaderFailure(this.#supervisor, READER_LABEL, method, error);
   }
 }
 

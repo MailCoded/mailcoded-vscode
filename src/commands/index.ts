@@ -7,6 +7,7 @@ import type { DaemonStatus } from "../daemon/types.js";
 import type { AccountDto, EnvelopeDto } from "../protocol/index.js";
 import { FlagNames, RpcErrorCode } from "../protocol/index.js";
 import type { MessageReader, MessageTagger } from "../reader/messageDocument.js";
+import type { ReaderPanel } from "../reader/readerPanel.js";
 import type { FolderTreeNode } from "../views/accountsTree.js";
 import type { FolderScope, MessageScope } from "../views/messagesTree.js";
 import type { MailcodedStatusBar } from "../views/statusBar.js";
@@ -25,6 +26,8 @@ export const COMMAND_SEARCH = "mailcoded.search";
 export const COMMAND_MARK_READ = "mailcoded.markRead";
 export const COMMAND_MARK_UNREAD = "mailcoded.markUnread";
 export const COMMAND_TOGGLE_FLAG = "mailcoded.toggleFlag";
+export const COMMAND_VIEW_HTML = "mailcoded.viewHtml";
+export const COMMAND_VIEW_PLAIN_TEXT = "mailcoded.viewPlainText";
 
 const SHOW_LOG = "Show Daemon Log";
 
@@ -57,6 +60,7 @@ export interface CommandDependencies {
   readonly statusBar: MailcodedStatusBar;
   readonly messages: MessagesView;
   readonly reader: MessageReader;
+  readonly readerPanel: ReaderPanel;
   readonly tagger: MessageTagger;
   readonly selection: CommandSelection;
 }
@@ -301,7 +305,7 @@ async function openMessage(deps: CommandDependencies, messageId: unknown): Promi
     await vscode.window.showInformationMessage(PICK_A_MESSAGE);
     return;
   }
-  await deps.reader.open(messageId);
+  await deps.readerPanel.open(messageId);
 }
 
 /** A query is scoped to one account: the selected one, or the first the daemon lists. */
@@ -428,5 +432,7 @@ export function registerCommands(
       changeTags(supervisor, deps, node, [FlagNames.Unread], [], "Marking the message unread"),
     ),
     vscode.commands.registerCommand(COMMAND_TOGGLE_FLAG, (node: unknown) => toggleFlag(supervisor, deps, node)),
+    vscode.commands.registerCommand(COMMAND_VIEW_HTML, () => deps.readerPanel.showHtml()),
+    vscode.commands.registerCommand(COMMAND_VIEW_PLAIN_TEXT, () => deps.readerPanel.showText()),
   );
 }

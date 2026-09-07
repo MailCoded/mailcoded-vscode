@@ -180,6 +180,18 @@
         "title": "%command.restartDaemon.title%",
         "category": "Mailcoded",
         "icon": "$(debug-restart)"
+      },
+      {
+        "command": "mailcoded.viewHtml",
+        "title": "%command.viewHtml.title%",
+        "category": "Mailcoded",
+        "icon": "$(code)"
+      },
+      {
+        "command": "mailcoded.viewPlainText",
+        "title": "%command.viewPlainText.title%",
+        "category": "Mailcoded",
+        "icon": "$(symbol-text)"
       }
     ],
     "menus": {
@@ -253,6 +265,26 @@
         {
           "command": "mailcoded.loadMore",
           "when": "false"
+        },
+        {
+          "command": "mailcoded.viewHtml",
+          "when": "false"
+        },
+        {
+          "command": "mailcoded.viewPlainText",
+          "when": "false"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "mailcoded.viewHtml",
+          "when": "activeWebviewPanelId == 'mailcoded.reader'",
+          "group": "navigation@1"
+        },
+        {
+          "command": "mailcoded.viewPlainText",
+          "when": "activeWebviewPanelId == 'mailcoded.reader'",
+          "group": "navigation@2"
         }
       ]
     },
@@ -282,6 +314,19 @@
           "type": "boolean",
           "default": true,
           "description": "%config.markReadOnOpen.description%"
+        },
+        "mailcoded.readerDefault": {
+          "type": "string",
+          "default": "text",
+          "enum": [
+            "text",
+            "html"
+          ],
+          "enumDescriptions": [
+            "%config.readerDefault.text%",
+            "%config.readerDefault.html%"
+          ],
+          "description": "%config.readerDefault.description%"
         },
         "mailcoded.logLevel": {
           "type": "string",

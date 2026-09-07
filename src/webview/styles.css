@@ -1,8 +1,208 @@
+/* No @font-face and no url() to anything remote: the policy in src/reader/shell.ts forbids both. */
+
+:root {
+  --mc-measure: 78ch;
+  --mc-html-measure: 960px;
+  --mc-rule: var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
+  --mc-muted: var(--vscode-descriptionForeground, #888);
+  --mc-gap: 0.35rem;
+}
+
+html,
 body {
   margin: 0;
-  padding: 0.75rem;
+  padding: 0;
+}
+
+body {
   font-family: var(--vscode-font-family);
   font-size: var(--vscode-font-size);
+  line-height: 1.5;
   color: var(--vscode-foreground);
   background: var(--vscode-editor-background);
+  padding: 0 1rem 2rem;
+  overflow-wrap: break-word;
+}
+
+#mc-toolbar,
+#mc-banner,
+#mc-header,
+#mc-attachments,
+.mc-status {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  position: static !important;
+  z-index: 10 !important;
+  max-width: var(--mc-html-measure);
+  color: var(--vscode-foreground) !important;
+}
+
+#mc-toolbar:empty,
+#mc-banner:empty,
+#mc-attachments:empty {
+  display: none !important;
+}
+
+/* Toolbar --------------------------------------------------------------- */
+
+#mc-toolbar {
+  position: sticky !important;
+  top: 0;
+  padding: 0.5rem 0;
+  background: var(--vscode-editor-background);
+  border-bottom: 1px solid var(--mc-rule);
+  display: flex !important;
+  gap: 0.5rem;
+}
+
+button {
+  font-family: inherit;
+  font-size: 0.9em;
+  color: var(--vscode-button-secondaryForeground, var(--vscode-foreground));
+  background: var(--vscode-button-secondaryBackground, transparent);
+  border: 1px solid var(--mc-rule);
+  border-radius: 3px;
+  padding: 0.2rem 0.7rem;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  background: var(--vscode-button-secondaryHoverBackground, var(--vscode-list-hoverBackground));
+}
+
+button:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: 1px;
+}
+
+.mc-mode--active {
+  color: var(--vscode-button-foreground);
+  background: var(--vscode-button-background);
+  border-color: var(--vscode-button-background);
+  cursor: default;
+}
+
+.mc-status {
+  padding: 0.35rem 0;
+  font-size: 0.9em;
+  color: var(--mc-muted) !important;
+}
+
+/* Blocked-image bar ---------------------------------------------------- */
+
+.mc-blocked {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0.6rem 0;
+  padding: 0.45rem 0.7rem;
+  border: 1px solid var(--vscode-inputValidation-warningBorder, var(--mc-rule));
+  border-radius: 4px;
+  background: var(--vscode-inputValidation-warningBackground, transparent);
+  color: var(--vscode-inputValidation-warningForeground, var(--vscode-foreground)) !important;
+  font-size: 0.92em;
+}
+
+.mc-blocked__count {
+  flex: 1 1 auto;
+}
+
+.mc-blocked--allowed {
+  border-color: var(--mc-rule);
+  background: transparent;
+  color: var(--mc-muted) !important;
+}
+
+/* Header --------------------------------------------------------------- */
+
+#mc-header {
+  padding: 0.8rem 0 0.6rem;
+  border-bottom: 1px solid var(--mc-rule);
+}
+
+.mc-subject {
+  margin: 0 0 0.5rem;
+  font-size: 1.35em;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.mc-field {
+  display: flex;
+  gap: 0.5rem;
+  font-size: 0.92em;
+}
+
+.mc-field__label {
+  flex: 0 0 4.5rem;
+  text-align: right;
+  color: var(--mc-muted);
+}
+
+.mc-field__value {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.mc-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--mc-gap);
+}
+
+.mc-tag {
+  padding: 0 0.4rem;
+  border: 1px solid var(--mc-rule);
+  border-radius: 999px;
+  font-size: 0.9em;
+  color: var(--mc-muted);
+}
+
+/* Attachments ---------------------------------------------------------- */
+
+#mc-attachments {
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--mc-rule);
+}
+
+.mc-attachment {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.15rem 0;
+  font-size: 0.92em;
+}
+
+.mc-attachment__name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mc-attachment__mime,
+.mc-attachment__size {
+  color: var(--mc-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Body ----------------------------------------------------------------- */
+
+/* `contain` makes this the containing block and clips it, so mail CSS cannot use
+   position: fixed to lift itself out over the header or the blocked-image bar. */
+#mc-body {
+  contain: layout paint;
+  isolation: isolate;
+  overflow-x: auto;
+  padding-top: 0.9rem;
+}
+
+.mc-body--html {
+  max-width: var(--mc-html-measure);
+}
+
+.mc-body--text {
+  max-width: var(--mc-measure);
 }
