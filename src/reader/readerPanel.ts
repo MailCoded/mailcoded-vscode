@@ -56,6 +56,8 @@ const NOTHING_TO_ALLOW = "No image origin in this message could be allowed.";
 const LOADING_HTML = "Loading the HTML part…";
 const WRITE_FAILED = "The attachment could not be written to that location.";
 const SHELL_FAILED = "The mail reader could not be shown in this VS Code; opening the message as plain text.";
+const OPENING = "Opening the message…";
+const EMPTY_ATTACHMENT = "That attachment has no bytes to save.";
 
 /** `https://host` or `https://host:port`, and nothing else: no path, no userinfo, no wildcard.
  * These are the only strings that may ever widen the image policy of a single render. */
@@ -200,6 +202,10 @@ class ReaderWebviewPanel implements ReaderPanel {
 
   #panel: vscode.WebviewPanel | undefined;
   #loadedPolicyKey: string | undefined;
+  /** Bumped by every user-initiated open or mode change. A response for an older generation may
+   * still fill the cache, but it may never touch the screen. */
+  #generation = 0;
+  #pendingStatus: string | undefined;
   #ready = false;
   #pending: RenderFrame | undefined;
   #current: RenderFrame | undefined;
@@ -226,30 +232,30 @@ class ReaderWebviewPanel implements ReaderPanel {
     if (!Number.isSafeInteger(messageId) || messageId <= 0) {
       return;
     }
-
-    const panel = this.#ensurePanel();
-    if (panel === undefined) {
-      await this.#fallback.open(messageId);
-      return;
-    }
+    const generation = this.#begin();
 
     const cached = this.#cache.get(messageId);
     if (cached !== undefined) {
-      panel.title = title(cached.envelope);
-      panel.reveal(panel.viewColumn, true);
-      if (!(await this.#show(messageId, cached.text))) {
+      if (!(await this.#present(messageId, cached.envelope, cached.text, generation))) {
         return;
       }
-      await this.#upgrade(messageId);
+      await this.#upgrade(messageId, generation);
       return;
     }
 
     let message: MessageGetResult;
     try {
-      message = await getMessage(this.#supervisor.client, messageId, true);
+      // `fetchIfMissing` can queue behind a whole folder sync on the account's one IMAP
+      // connection, so the wait is reported rather than hidden behind an empty editor.
+      message = await vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Window, title: OPENING },
+        () => getMessage(this.#supervisor.client, messageId, true),
+      );
     } catch (error: unknown) {
       logReaderFailure(this.#supervisor, READER_LABEL, "message.get", error);
-      await vscode.window.showWarningMessage(explain(error, { operation: "Opening the message" }).text);
+      if (!this.#stale(generation)) {
+        await vscode.window.showWarningMessage(explain(error, { operation: "Opening the message" }).text);
+      }
       return;
     }
 
@@ -267,15 +273,44 @@ class ReaderWebviewPanel implements ReaderPanel {
       return;
     }
 
+    // Cached before the staleness check: the body was paid for, so a later click still gets it free.
     this.#remember(messageId, { envelope: message.envelope, text });
-    panel.title = title(message.envelope);
-    panel.reveal(panel.viewColumn, true);
-    const shown = await this.#show(messageId, text);
+    if (this.#stale(generation)) {
+      return;
+    }
+    if (!(await this.#present(messageId, message.envelope, text, generation))) {
+      return;
+    }
 
     await markMessageRead(this.#supervisor, this.#tagger, READER_LABEL, message.envelope);
-    if (shown) {
-      await this.#upgrade(messageId);
+    await this.#upgrade(messageId, generation);
+  }
+
+  #begin(): number {
+    this.#generation += 1;
+    return this.#generation;
+  }
+
+  #stale(generation: number): boolean {
+    return generation !== this.#generation;
+  }
+
+  /** The panel is created here and nowhere earlier, so a fetch that is slow or fails never leaves
+   * an empty editor titled "(no subject)" on the screen. */
+  async #present(
+    messageId: number,
+    envelope: EnvelopeDto,
+    render: RenderFrame,
+    generation: number,
+  ): Promise<boolean> {
+    const panel = this.#ensurePanel();
+    if (panel === undefined) {
+      await this.#fallback.open(messageId);
+      return false;
     }
+    panel.title = title(envelope);
+    panel.reveal(panel.viewColumn, true);
+    return this.#show(messageId, render, generation);
   }
 
   async showHtml(): Promise<void> {
@@ -285,7 +320,7 @@ class ReaderWebviewPanel implements ReaderPanel {
       await vscode.window.showInformationMessage(NO_MESSAGE_OPEN);
       return;
     }
-    await this.#renderHtml(messageId);
+    await this.#renderHtml(messageId, this.#begin());
   }
 
   async showText(): Promise<void> {
@@ -300,7 +335,7 @@ class ReaderWebviewPanel implements ReaderPanel {
       await this.open(messageId);
       return;
     }
-    await this.#show(messageId, cached.text);
+    await this.#show(messageId, cached.text, this.#begin());
   }
 
   dispose(): void {
@@ -325,7 +360,10 @@ class ReaderWebviewPanel implements ReaderPanel {
 
   /** A frame that cannot be shown here must not vanish: the panel is closed and the same message
    * opens in the plaintext document reader, with a warning that names the log. */
-  async #show(messageId: number, render: RenderFrame): Promise<boolean> {
+  async #show(messageId: number, render: RenderFrame, generation: number): Promise<boolean> {
+    if (this.#stale(generation)) {
+      return false;
+    }
     if (this.#post(render)) {
       return true;
     }
@@ -338,9 +376,9 @@ class ReaderWebviewPanel implements ReaderPanel {
     return false;
   }
 
-  async #upgrade(messageId: number): Promise<void> {
+  async #upgrade(messageId: number, generation: number): Promise<void> {
     if (this.#mode() === "html") {
-      await this.#renderHtml(messageId);
+      await this.#renderHtml(messageId, generation);
     }
   }
 
@@ -357,9 +395,11 @@ class ReaderWebviewPanel implements ReaderPanel {
 
   /** `bodyHtml` is raw attacker HTML. It travels as data, by `postMessage`, to a webview that
    * sanitises it; it is never interpolated into the shell and never touches the host DOM. */
-  async #renderHtml(messageId: number): Promise<void> {
+  async #renderHtml(messageId: number, generation: number): Promise<void> {
     const cached = this.#cache.get(messageId);
-    if (cached === undefined) {
+    // No `#ensurePanel` anywhere below: a render that finishes after the user closed the reader
+    // must not put the panel back.
+    if (cached === undefined || this.#panel === undefined || this.#stale(generation)) {
       return;
     }
     if (cached.html !== undefined) {
@@ -374,8 +414,14 @@ class ReaderWebviewPanel implements ReaderPanel {
       message = await getMessageHtmlForWebview(this.#supervisor.client, messageId, true);
     } catch (error: unknown) {
       logReaderFailure(this.#supervisor, READER_LABEL, "message.get", error);
+      if (this.#stale(generation)) {
+        return;
+      }
       this.#post(cached.text);
       await vscode.window.showWarningMessage(HTML_FAILED);
+      return;
+    }
+    if (this.#stale(generation)) {
       return;
     }
 
@@ -403,12 +449,17 @@ class ReaderWebviewPanel implements ReaderPanel {
       allowedOrigins: [],
     });
     if (html === undefined) {
-      this.#post(cached.text);
-      await vscode.window.showWarningMessage(HTML_FAILED);
+      if (!this.#stale(generation)) {
+        this.#post(cached.text);
+        await vscode.window.showWarningMessage(HTML_FAILED);
+      }
       return;
     }
 
     this.#remember(messageId, { envelope: message.envelope, text: cached.text, html });
+    if (this.#stale(generation) || this.#panel === undefined) {
+      return;
+    }
     this.#post(html);
   }
 
@@ -451,13 +502,14 @@ class ReaderWebviewPanel implements ReaderPanel {
     this.#loadedPolicyKey = undefined;
     this.#ready = false;
     this.#pending = undefined;
+    this.#pendingStatus = undefined;
     this.#current = undefined;
     this.#cache.clear();
     this.#blocked.clear();
   }
 
   #post(render: RenderFrame): boolean {
-    const panel = this.#ensurePanel();
+    const panel = this.#panel;
     if (panel === undefined) {
       return false;
     }
@@ -506,16 +558,26 @@ class ReaderWebviewPanel implements ReaderPanel {
     return true;
   }
 
+  /** Queued rather than dropped when the document is still loading, which is exactly the case on
+   * a first open: otherwise the only word the user gets about a slow HTML fetch is silence. */
   #status(text: string): void {
-    if (this.#panel === undefined || !this.#ready) {
+    if (this.#panel === undefined) {
       return;
     }
+    if (!this.#ready) {
+      this.#pendingStatus = text;
+      return;
+    }
+    this.#postStatus(text);
+  }
+
+  #postStatus(text: string): void {
     const status = parseHostMessage({ type: "status", text });
     if (status?.type !== "status") {
       return;
     }
     const frame: StatusFrame = status;
-    void this.#panel.webview.postMessage(frame);
+    void this.#panel?.webview.postMessage(frame);
   }
 
   async #receive(raw: unknown): Promise<void> {
@@ -533,6 +595,12 @@ class ReaderWebviewPanel implements ReaderPanel {
         this.#pending = undefined;
         if (frame !== undefined) {
           void this.#panel?.webview.postMessage(frame);
+        }
+        // After the frame: rendering a message clears the status line.
+        const status = this.#pendingStatus;
+        this.#pendingStatus = undefined;
+        if (status !== undefined) {
+          this.#postStatus(status);
         }
         return;
       }
@@ -640,6 +708,7 @@ class ReaderWebviewPanel implements ReaderPanel {
 
     if (bytes === undefined) {
       this.#note("refused an attachment whose bytes did not decode");
+      await vscode.window.showWarningMessage(EMPTY_ATTACHMENT);
       return;
     }
 

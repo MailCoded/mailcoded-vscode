@@ -59,14 +59,17 @@ interface FakeVscodeState {
   readonly contentProviders: Map<string, FakeContentProvider>;
   readonly shownDocuments: FakeTextDocument[];
   readonly inputBoxAnswers: (string | undefined)[];
+  readonly messageAnswers: (string | undefined)[];
+  readonly progress: string[];
   readonly webviewPanels: FakeWebviewPanel[];
   webviewCspSource: string;
 }
 
 /** Exactly what a Remote-WSL extension host returns: `cspSource` is a source list, and
- * `asWebviewUri` maps a file: URI onto the vscode-cdn.net resource authority. */
+ * `asWebviewUri` maps a file: URI onto `<scheme>+<encoded authority>.vscode-resource.vscode-cdn.net`,
+ * whose `+` the URI serializer then percent-encodes and whose case it lowers. */
 export const REAL_WEBVIEW_CSP_SOURCE = "'self' https://*.vscode-cdn.net";
-export const REAL_WEBVIEW_RESOURCE_AUTHORITY = "vscode-remote+wsl-002bubuntu.vscode-resource.vscode-cdn.net";
+export const REAL_WEBVIEW_RESOURCE_AUTHORITY = "vscode-remote%2Bwsl-002bubuntu.vscode-resource.vscode-cdn.net";
 
 /** The alias resolves for both `import` and `require`, so the module can load twice; the state
  * it records must not. */
@@ -79,6 +82,8 @@ const state: FakeVscodeState = ((): FakeVscodeState => {
     contentProviders: new Map<string, FakeContentProvider>(),
     shownDocuments: [],
     inputBoxAnswers: [],
+    messageAnswers: [],
+    progress: [],
     webviewPanels: [],
     webviewCspSource: REAL_WEBVIEW_CSP_SOURCE,
   };
@@ -90,12 +95,16 @@ class Recorder {
   readonly notifications = state.notifications;
   readonly shownDocuments = state.shownDocuments;
   readonly webviewPanels = state.webviewPanels;
+  /** Titles passed to `window.withProgress`, so "the user was told it is working" is testable. */
+  readonly progress = state.progress;
 
   reset(): void {
     this.channels.clear();
     this.notifications.length = 0;
     this.shownDocuments.length = 0;
     state.inputBoxAnswers.length = 0;
+    state.messageAnswers.length = 0;
+    this.progress.length = 0;
     this.webviewPanels.length = 0;
     state.webviewCspSource = REAL_WEBVIEW_CSP_SOURCE;
   }
@@ -108,6 +117,12 @@ class Recorder {
   /** What `window.showInputBox` answers, in order; an exhausted queue answers `undefined`. */
   answerInputBox(...answers: readonly (string | undefined)[]): void {
     state.inputBoxAnswers.push(...answers);
+  }
+
+  /** Which button a notification is answered with, in order. An answer the call did not offer is
+   * ignored, exactly as a dismissed notification behaves. */
+  answerMessage(...answers: readonly (string | undefined)[]): void {
+    state.messageAnswers.push(...answers);
   }
 
   lines(name?: string): readonly string[] {
@@ -175,9 +190,10 @@ function createOutputChannel(name: string): FakeOutputChannel {
   };
 }
 
-function showMessage(message: string): Promise<undefined> {
+function showMessage(message: string, ...items: readonly string[]): Promise<string | undefined> {
   recorder.notifications.push(message);
-  return Promise.resolve(undefined);
+  const answer = state.messageAnswers.shift();
+  return Promise.resolve(answer !== undefined && items.includes(answer) ? answer : undefined);
 }
 
 export interface FakeUri {
@@ -350,7 +366,12 @@ export const window = {
     hide: () => undefined,
     dispose: () => undefined,
   }),
-  withProgress: <T>(_options: unknown, task: () => PromiseLike<T>): PromiseLike<T> => task(),
+  withProgress: <T>(options: unknown, task: () => PromiseLike<T>): PromiseLike<T> => {
+    const title = (options as { title?: unknown } | undefined)?.title;
+    if (typeof title === "string") state.progress.push(title);
+    return task();
+  },
+  showSaveDialog: (): Promise<FakeUri | undefined> => Promise.resolve(undefined),
 };
 
 export const workspace = {

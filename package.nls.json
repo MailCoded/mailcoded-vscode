@@ -40,6 +40,7 @@
   "config.dataDir.description": "Directory holding the mail store. Leave empty for the platform default. Never point this inside a workspace folder.",
   "config.pageSize.description": "Number of messages requested per page in the message list.",
   "config.markReadOnOpen.description": "Mark a message as read when it is opened in the reader.",
+  "config.notifyNewMail.description": "Show a notification when new mail arrives. Arrivals within a few seconds are combined into one message, and the folder badge updates either way.",
   "config.readerDefault.description": "Which body a message opens in. Plain text is the default and the safe choice; HTML is sanitized in a sandboxed view and blocks remote images until you allow them for that message.",
   "config.readerDefault.text": "Open the plaintext body.",
   "config.readerDefault.html": "Open the sanitized HTML body, with remote images blocked.",

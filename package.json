@@ -315,6 +315,11 @@
           "default": true,
           "description": "%config.markReadOnOpen.description%"
         },
+        "mailcoded.notifyNewMail": {
+          "type": "boolean",
+          "default": true,
+          "description": "%config.notifyNewMail.description%"
+        },
         "mailcoded.readerDefault": {
           "type": "string",
           "default": "text",

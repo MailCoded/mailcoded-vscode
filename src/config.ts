@@ -13,6 +13,7 @@ export interface MailcodedConfig {
   readonly dataDir: string;
   readonly pageSize: number;
   readonly markReadOnOpen: boolean;
+  readonly notifyNewMail: boolean;
   readonly logLevel: LogLevel;
   readonly quoteLines: number;
   readonly threadGrouping: boolean;
@@ -24,6 +25,7 @@ export const CONFIG_DEFAULTS: MailcodedConfig = {
   dataDir: "",
   pageSize: 50,
   markReadOnOpen: true,
+  notifyNewMail: true,
   logLevel: "info",
   quoteLines: 200,
   threadGrouping: true,
@@ -67,6 +69,7 @@ export function readConfiguration(scope?: vscode.ConfigurationScope): MailcodedC
     dataDir: trusted ? text(section.get("dataDir")) : CONFIG_DEFAULTS.dataDir,
     pageSize: clampInteger(section.get("pageSize"), CONFIG_DEFAULTS.pageSize, PAGE_SIZE_MIN, PAGE_SIZE_MAX),
     markReadOnOpen: boolean(section.get("markReadOnOpen"), CONFIG_DEFAULTS.markReadOnOpen),
+    notifyNewMail: boolean(section.get("notifyNewMail"), CONFIG_DEFAULTS.notifyNewMail),
     logLevel: logLevel(section.get("logLevel")),
     quoteLines: clampInteger(section.get("quoteLines"), CONFIG_DEFAULTS.quoteLines, 0, Number.MAX_SAFE_INTEGER),
     threadGrouping: boolean(section.get("threadGrouping"), CONFIG_DEFAULTS.threadGrouping),
@@ -85,6 +88,7 @@ function same(a: MailcodedConfig, b: MailcodedConfig): boolean {
     a.dataDir === b.dataDir &&
     a.pageSize === b.pageSize &&
     a.markReadOnOpen === b.markReadOnOpen &&
+    a.notifyNewMail === b.notifyNewMail &&
     a.logLevel === b.logLevel &&
     a.quoteLines === b.quoteLines &&
     a.threadGrouping === b.threadGrouping &&

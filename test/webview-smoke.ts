@@ -111,6 +111,11 @@ const cases: SmokeCase[] = [
     check: "click-link",
   },
   {
+    name: "a link the sanitiser rejected does not look like a link",
+    bodyHtml: '<p><a href="https://ok.example/x">good</a> <a href="http://insecure.example/x">bad</a></p>',
+    check: "dead-link-not-styled",
+  },
+  {
     name: "plain text mode",
     mode: "text",
     bodyText: "see https://ok.example/t\n<b>not bold</b>",
@@ -229,6 +234,17 @@ const DRIVER = String.raw`
         { check: "navigation cancelled", ok: cancelled, detail: String(cancelled) },
         { check: "openLink posted", ok: posts.some((p) => p.type === "openLink" && p.href === "https://ok.example/x"), detail: JSON.stringify(posts) },
         { check: "still on the page", ok: location.href.startsWith("file:"), detail: location.href.slice(0, 20) },
+      ];
+    },
+    "dead-link-not-styled": () => {
+      const anchors = [...mail().querySelectorAll("a")];
+      const good = anchors.find((a) => a.hasAttribute("href"));
+      const bad = anchors.find((a) => !a.hasAttribute("href"));
+      const line = (element) => (element ? getComputedStyle(element).textDecorationLine : "no element");
+      return [
+        { check: "both anchors survive", ok: anchors.length === 2, detail: String(anchors.length) },
+        { check: "the working link is underlined", ok: line(good).includes("underline"), detail: line(good) },
+        { check: "the dead link is not underlined", ok: !!bad && !line(bad).includes("underline"), detail: line(bad) },
       ];
     },
     "text-mode": () => {

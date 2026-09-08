@@ -2,15 +2,19 @@ import * as vscode from "vscode";
 
 import { createMessageTagger, registerCommands } from "./commands/index.js";
 import type { CommandSelection } from "./commands/index.js";
+import { readConfiguration } from "./config.js";
 import { createDaemonSupervisor } from "./daemon/supervisor.js";
 import type { MailcodedDaemonSupervisor } from "./daemon/supervisor.js";
 import type { DaemonStatus } from "./daemon/types.js";
+import { createMailWatcher } from "./daemon/watch.js";
+import type { MailWatcher } from "./daemon/watch.js";
 import { ContextKeys } from "./context.js";
 import { hardenLine } from "./model/messageFormat.js";
 import type { EnvelopeDto } from "./protocol/index.js";
 import { createMessageReader } from "./reader/messageDocument.js";
 import { createReaderPanel } from "./reader/readerPanel.js";
 import type { ReaderPanel } from "./reader/readerPanel.js";
+import { createNewMailNotifier } from "./views/mailNotifier.js";
 import { ACCOUNTS_VIEW_ID, AccountsTreeProvider } from "./views/accountsTree.js";
 import type { MailcodedTreeNode } from "./views/accountsTree.js";
 import { MESSAGES_VIEW_ID, MessagesTreeProvider } from "./views/messagesTree.js";
@@ -24,6 +28,7 @@ export interface MailcodedApi {
     readonly tree: AccountsTreeProvider;
     readonly messages: MessagesTreeProvider;
     readonly readerPanel: ReaderPanel;
+    readonly watcher: MailWatcher;
   };
 }
 
@@ -117,7 +122,31 @@ export function activate(context: vscode.ExtensionContext): MailcodedApi {
     },
   };
 
-  context.subscriptions.push(supervisor, keys, tree, view, messages, messagesView, reader, readerPanel, statusBar);
+  // Notifications arrive only for a subscriber (rpc.md 5), so without this watcher nothing below
+  // ever fires: not the trees, not the badge, not the status bar.
+  const watcher = createMailWatcher(supervisor);
+  const notifier = createNewMailNotifier({
+    supervisor,
+    reveal: (scope) => {
+      messages.show(scope);
+      selection.revealMessages();
+    },
+    enabled: () => readConfiguration().notifyNewMail,
+  });
+
+  context.subscriptions.push(
+    supervisor,
+    keys,
+    tree,
+    view,
+    messages,
+    messagesView,
+    reader,
+    readerPanel,
+    statusBar,
+    watcher,
+    notifier,
+  );
   context.subscriptions.push(tree.onDidChangeTreeData(badge));
   context.subscriptions.push(
     messages.onDidChangeTreeData(() => {
@@ -140,7 +169,7 @@ export function activate(context: vscode.ExtensionContext): MailcodedApi {
   void supervisor.start();
 
   return process.env["MAILCODED_TEST"] === "1"
-    ? { supervisor, _test: { contextKeys: keys, tree, messages, readerPanel } }
+    ? { supervisor, _test: { contextKeys: keys, tree, messages, readerPanel, watcher } }
     : { supervisor };
 }
 

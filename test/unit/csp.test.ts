@@ -278,9 +278,9 @@ describe("buildShell", () => {
 const REAL_CSP_SOURCE = "'self' https://*.vscode-cdn.net";
 const REAL_WEB_CSP_SOURCE = "https://example.com/extensions/mailcoded/ 'self' https://*.vscode-cdn.net";
 const REAL_REMOTE_SCRIPT_URI =
-  "https://vscode-remote+wsl-002bubuntu.vscode-resource.vscode-cdn.net/home/lin/works/mailcoded/mailcoded-vscode/dist/webview/main.js";
+  "https://vscode-remote%2Bwsl-002bubuntu.vscode-resource.vscode-cdn.net/home/lin/works/mailcoded/mailcoded-vscode/dist/webview/main.js";
 const REAL_LOCAL_SCRIPT_URI =
-  "https://file+.vscode-resource.vscode-cdn.net/home/lin/works/mailcoded/mailcoded-vscode/dist/webview/main.js";
+  "https://file%2B.vscode-resource.vscode-cdn.net/home/lin/works/mailcoded/mailcoded-vscode/dist/webview/main.js";
 
 describe("the cspSource VS Code really passes", () => {
   it("is a source list with a quoted keyword and a space, and lands in style-src verbatim", () => {

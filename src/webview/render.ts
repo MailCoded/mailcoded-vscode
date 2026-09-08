@@ -36,8 +36,10 @@ const MAIL_STYLES = `
   white-space: pre-wrap;
   overflow-wrap: break-word;
 }
-a { color: var(--vscode-textLink-foreground); text-decoration: underline; }
-a:hover { color: var(--vscode-textLink-activeForeground); }
+/* Scoped to anchors that kept an href: the sanitiser strips the rest, and a link that cannot be
+   opened must not look like one. */
+a[href] { color: var(--vscode-textLink-foreground); text-decoration: underline; }
+a[href]:hover { color: var(--vscode-textLink-activeForeground); }
 img { max-width: 100%; height: auto; }
 img[data-mc-remote] {
   outline: 1px dashed var(--mc-rule);

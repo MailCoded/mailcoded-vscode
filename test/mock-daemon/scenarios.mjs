@@ -298,12 +298,27 @@ function searchResult(params) {
   return { hits, nextCursor: more ? cursorAt(to) : null, truncated: more };
 }
 
+/** rpc.md §4: `accountId` is required, `folderIds` is optional and must be an array of numbers.
+ * Validating here is what turns "the extension subscribes correctly" into a test rather than a hope. */
+function watchParamsProblem(params) {
+  const accountId = params?.accountId;
+  if (typeof accountId !== "number" || !Number.isInteger(accountId) || accountId <= 0) {
+    return "watch.subscribe needs a positive integer accountId";
+  }
+  const folderIds = params?.folderIds;
+  if (folderIds !== undefined && (!Array.isArray(folderIds) || folderIds.some((id) => typeof id !== "number"))) {
+    return "watch.subscribe folderIds must be an array of numbers when it is present";
+  }
+  return undefined;
+}
+
 function accountsScenario({
   accounts = TREE_ACCOUNTS,
   folders = TREE_FOLDERS,
   failFor = [],
   watch = true,
   searchFails = false,
+  refuseWatch = false,
 } = {}) {
   const failing = new Set(failFor);
   return {
@@ -329,6 +344,19 @@ function accountsScenario({
         return;
       }
       if (method === "watch.subscribe") {
+        const problem = watchParamsProblem(params);
+        if (problem !== undefined) {
+          ctx.error(id, -32602, problem, { category: "protocol" });
+          return;
+        }
+        if (refuseWatch) {
+          ctx.error(id, 1008, "This daemon is not watching this store.", {
+            category: "unsupported",
+            requiresUserAction: false,
+            accountId: params.accountId,
+          });
+          return;
+        }
         ctx.reply(id, {});
         ctx.notify("notify.folder.updated", TREE_FOLDER_UPDATED);
         return;
@@ -403,6 +431,11 @@ export const SCENARIOS = {
   notify: {
     handle(ctx, request) {
       if (request.method === "watch.subscribe") {
+        const problem = watchParamsProblem(request.params);
+        if (problem !== undefined) {
+          ctx.error(request.id, -32602, problem, { category: "protocol" });
+          return;
+        }
         ctx.notify("notify.mail.added", mailAdded({ count: 25, size: 2 }));
         ctx.notify("notify.mail.added", mailAdded({ count: 2, size: 2 }));
         ctx.notify("notify.sync.error", SYNC_ERROR);
@@ -461,6 +494,9 @@ export const SCENARIOS = {
 
   /** Every `search` answers 1004: the message list must render empty, never reject. */
   accountsSearchFails: accountsScenario({ searchFails: true }),
+
+  /** `watch.subscribe` answers 1008 for every account: a refusal is final, never retried. */
+  accountsWatchRefused: accountsScenario({ refuseWatch: true }),
 };
 
 export function scenario(name) {

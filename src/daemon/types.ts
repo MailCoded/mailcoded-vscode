@@ -215,7 +215,9 @@ export const REQUEST_TIMEOUTS_MS: RequestTimeoutTable = {
   default: 30_000,
   sync: 600_000,
   "account.add": 600_000,
-  "message.get": 60_000,
+  // The daemon serializes commands per account, so an on-demand body fetch waits for a running
+  // folder sync. The request carries no cancellation, so a shorter budget only abandons the answer.
+  "message.get": 600_000,
   "attachment.get": 60_000,
   shutdown: 2_000,
 };
