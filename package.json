@@ -413,7 +413,7 @@
     "smoke:webview": "tsx test/webview-smoke.ts"
   },
   "dependencies": {
-    "dompurify": "^3.4.14",
+    "dompurify": "^3.4.15",
     "vscode-jsonrpc": "^9.0.2"
   },
   "devDependencies": {
