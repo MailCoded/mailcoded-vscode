@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 
 import {
   ALLOWED_URI_REGEXP,
+  URI_FREE_ATTRIBUTES,
   FORBIDDEN_EVENT_ATTRIBUTES,
   FORBIDDEN_TAGS,
   REMOTE_IMAGE_ATTRIBUTE,
@@ -268,6 +269,106 @@ describe("CSS", () => {
     const css = cleaned.element.querySelector("style")?.textContent ?? "";
     assert.equal(css.trim(), "");
     assert.equal(cleaned.census.blocked, 1);
+  });
+});
+
+/** HTML mail is built on presentational attributes, and DOMPurify tests every attribute it does not
+ * know to be URI-free against ALLOWED_URI_REGEXP. Ours is `https:`/`mailto:` only, so `bgcolor` and
+ * `colspan` failed it and every newsletter arrived stripped of its layout. */
+describe("the presentational markup HTML mail is built on", () => {
+  const KEPT: readonly (readonly [string, string, string])[] = [
+    ["td", "bgcolor", "#313640"],
+    ["td", "align", "center"],
+    ["td", "valign", "middle"],
+    ["td", "width", "440"],
+    ["td", "height", "38"],
+    ["td", "colspan", "2"],
+    ["td", "rowspan", "3"],
+    ["td", "nowrap", "nowrap"],
+    ["table", "cellpadding", "0"],
+    ["table", "cellspacing", "0"],
+    ["table", "border", "0"],
+    ["table", "bgcolor", "#ffffff"],
+    ["table", "width", "100%"],
+    ["table", "align", "center"],
+    ["p", "dir", "rtl"],
+    ["p", "lang", "ar"],
+    ["font", "color", "#ff0000"],
+    ["font", "face", "Arial"],
+    ["font", "size", "3"],
+    ["img", "width", "600"],
+    ["img", "height", "200"],
+    ["ol", "start", "3"],
+    ["ol", "type", "a"],
+    ["th", "scope", "col"],
+  ];
+
+  function markup(tag: string, attribute: string, value: string): string {
+    const attr = `${attribute}="${value}"`;
+    if (tag === "table") return `<table ${attr}><tr><td>x</td></tr></table>`;
+    if (tag === "td" || tag === "th") return `<table><tr><${tag} ${attr}>x</${tag}></tr></table>`;
+    return `<table><tr><td><${tag} ${attr}>x</${tag}></td></tr></table>`;
+  }
+
+  for (const [tag, attribute, value] of KEPT) {
+    it(`keeps ${attribute} on ${tag}`, () => {
+      const cleaned = clean(markup(tag, attribute, value));
+      const carrier = cleaned.element.querySelector(`${tag}[${attribute}]`);
+      assert.equal(carrier?.getAttribute(attribute), value, cleaned.html);
+    });
+  }
+
+  it("keeps a cell's colour and the white text written for it together", () => {
+    const cleaned = clean('<table><tr><td bgcolor="#313640"><span style="color:#fff">PROJECT</span></td></tr></table>');
+    const cell = cleaned.element.querySelector("td");
+    assert.equal(cell?.getAttribute("bgcolor"), "#313640");
+    assert.equal(cell?.querySelector("span")?.getAttribute("style"), "color:#fff");
+  });
+
+  /** The guard that matters: this list may only ever stop a URI check, never start naming
+   * resources. Anything that can point at one belongs to the sanitiser's own branches. */
+  it("names nothing that could carry a URL", () => {
+    const resourceBearing = [
+      "action",
+      "archive",
+      "background",
+      "cite",
+      "classid",
+      "codebase",
+      "data",
+      "dynsrc",
+      "formaction",
+      "href",
+      "longdesc",
+      "lowsrc",
+      "manifest",
+      "ping",
+      "poster",
+      "profile",
+      "src",
+      "srcdoc",
+      "srcset",
+      "usemap",
+      "xlink:href",
+    ];
+    for (const name of resourceBearing) {
+      assert.ok(!URI_FREE_ATTRIBUTES.includes(name), `${name} may never be treated as URI-free`);
+    }
+    assert.ok(URI_FREE_ATTRIBUTES.every((name) => /^[a-z]+$/.test(name)), URI_FREE_ATTRIBUTES.join(","));
+    assert.equal(new Set(URI_FREE_ATTRIBUTES).size, URI_FREE_ATTRIBUTES.length);
+  });
+
+  it("still refuses every attribute that could fetch or run something", () => {
+    const cleaned = clean(
+      '<table><tr><td background="https://a.example/b.png">' +
+        '<img src="https://b.example/x.png" srcset="https://c.example/x.png 1x">' +
+        '<a href="javascript:alert(1)" ping="https://d.example/p">x</a>' +
+        '<div onclick="alert(1)">y</div></td></tr></table>',
+    );
+    for (const attribute of ["background", "src", "srcset", "ping", "onclick"]) {
+      assert.equal(cleaned.element.querySelector(`[${attribute}]`), null, `${attribute} survived: ${cleaned.html}`);
+    }
+    assert.equal(cleaned.element.querySelector("a")?.getAttribute("href"), null);
   });
 });
 

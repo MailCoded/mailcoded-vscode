@@ -17,6 +17,40 @@ export const FORBIDDEN_TAGS: readonly string[] = Object.freeze([
   "base",
 ]);
 
+/** Attributes that can never name a resource. DOMPurify tests every attribute it does not know to
+ * be URI-free against `ALLOWED_URI_REGEXP`, and ours is `https:`/`mailto:` alone, so without this
+ * list `bgcolor="#313640"`, `align="center"`, `colspan="2"` and `dir="rtl"` all fail it and a
+ * newsletter loses the presentational markup HTML mail is built on. Every name here is already in
+ * DOMPurify's own attribute allowlist, so this can only stop a URI check, never admit a new
+ * attribute. Nothing that can point at a resource may be added: not href, src, srcset, action,
+ * background, poster, cite, data, ping, longdesc, usemap or xlink:href. */
+export const URI_FREE_ATTRIBUTES: readonly string[] = Object.freeze([
+  "align",
+  "bgcolor",
+  "border",
+  "cellpadding",
+  "cellspacing",
+  "clear",
+  "color",
+  "colspan",
+  "coords",
+  "dir",
+  "face",
+  "headers",
+  "height",
+  "lang",
+  "nowrap",
+  "rowspan",
+  "scope",
+  "shape",
+  "size",
+  "span",
+  "start",
+  "type",
+  "valign",
+  "width",
+]);
+
 /** SPEC 6.3: `https` and `mailto`, and nothing else. */
 export const ALLOWED_URI_REGEXP = /^(?:https:|mailto:)/i;
 
@@ -234,6 +268,7 @@ export const SANITIZER_CONFIG: Readonly<Config> = Object.freeze({
   FORBID_TAGS: FORBIDDEN_TAGS as string[],
   FORBID_ATTR: FORBIDDEN_EVENT_ATTRIBUTES as string[],
   ALLOWED_URI_REGEXP,
+  ADD_URI_SAFE_ATTR: URI_FREE_ATTRIBUTES as string[],
   ALLOW_DATA_ATTR: false,
   ALLOW_UNKNOWN_PROTOCOLS: false,
   RETURN_DOM_FRAGMENT: true,

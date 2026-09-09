@@ -28,7 +28,28 @@ const MAIL_WRAPPER = "mc-mail";
 /** Lives inside the shadow root with the mail, which is the only place a rule can reach it. The
  * light-DOM stylesheet keeps the container's own containment and measure. */
 const MAIL_STYLES = `
-.${MAIL_WRAPPER} { overflow-wrap: anywhere; }
+/* Mail is written for a sheet of white paper. Rendering it on the editor's background makes any
+   newsletter that sets only a colour, or only a background, unreadable in half the themes: black
+   text on a dark editor, or the editor's pale text on the mail's own light table. The chrome above
+   stays themed; the message is a sheet. A mail rule for the body selector is rewritten onto this
+   class by the sanitiser and wins by source order, so mail with its own palette still gets it. */
+.${MAIL_WRAPPER} {
+  color-scheme: light;
+  background-color: #ffffff;
+  color: #1f1f1f;
+  padding: 1rem;
+  overflow-wrap: break-word;
+}
+/* Zero specificity, so any rule the mail brings wins outright. Fixed colours rather than theme
+   variables: on this canvas a theme-derived grey would be invisible in half the themes. */
+:where(a[href]) { color: #0b57d0; text-decoration: underline; }
+:where(a[href]:hover) { color: #0842a0; }
+:where(blockquote) { margin: 0.6rem 0; padding-left: 0.8rem; border-left: 3px solid #d0d0d0; color: #4a4a4a; }
+:where(hr) { border: 0; border-top: 1px solid #d0d0d0; }
+:where(h1, h2, h3) { line-height: 1.25; }
+:where(pre, code) { font-family: var(--vscode-editor-font-family, monospace); overflow-x: auto; white-space: pre-wrap; }
+:where(table) { max-width: 100%; }
+:where(td, th) { overflow-wrap: break-word; word-break: break-word; }
 .mc-text {
   margin: 0;
   font-family: var(--vscode-editor-font-family, monospace);
@@ -36,24 +57,16 @@ const MAIL_STYLES = `
   white-space: pre-wrap;
   overflow-wrap: break-word;
 }
-/* Scoped to anchors that kept an href: the sanitiser strips the rest, and a link that cannot be
-   opened must not look like one. */
-a[href] { color: var(--vscode-textLink-foreground); text-decoration: underline; }
-a[href]:hover { color: var(--vscode-textLink-activeForeground); }
 img { max-width: 100%; height: auto; }
+/* Reader chrome, not mail styling: full specificity so a newsletter cannot hide the marker that
+   says an image was blocked. */
 img[data-mc-remote] {
-  outline: 1px dashed var(--mc-rule);
+  outline: 1px dashed #b0b0b0;
   outline-offset: -1px;
   max-height: 40vh;
-  color: var(--mc-muted);
+  color: #6a6a6a;
   font-size: 0.85em;
 }
-table { max-width: 100%; border-collapse: collapse; table-layout: auto; }
-td, th { max-width: var(--mc-html-measure); overflow-wrap: break-word; word-break: break-word; vertical-align: top; }
-blockquote { margin: 0.6rem 0; padding-left: 0.8rem; border-left: 3px solid var(--mc-rule); color: var(--mc-muted); }
-pre, code { font-family: var(--vscode-editor-font-family, monospace); overflow-x: auto; white-space: pre-wrap; }
-hr { border: 0; border-top: 1px solid var(--mc-rule); }
-h1, h2, h3 { line-height: 1.25; }
 :is(input, select, textarea, button) { pointer-events: none; }
 `.trim();
 

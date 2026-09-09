@@ -13,6 +13,21 @@ const BUNDLE = path.join(ROOT, "dist", "webview", "main.js");
 const FIXTURES = path.join(ROOT, "test", "fixtures", "html");
 const PIXEL = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
 const PLACEHOLDER_SCRIPT = "vscode-file://smoke/main.js";
+
+/** Default Dark Modern, near enough. Every check runs under a theme rather than under undefined
+ * variables, because a dark editor is exactly where mail rendering used to break. */
+const DARK_THEME = [
+  "--vscode-foreground: #cccccc",
+  "--vscode-editor-background: #1f1f1f",
+  "--vscode-textLink-foreground: #4daafc",
+  "--vscode-textLink-activeForeground: #4daafc",
+  "--vscode-panel-border: #2b2b2b",
+  "--vscode-descriptionForeground: #9d9d9d",
+  "--vscode-font-family: sans-serif",
+  "--vscode-font-size: 13px",
+  "--vscode-editor-font-family: monospace",
+  "--vscode-editor-font-size: 13px",
+].join(";");
 const BUDGET_MS = 20000;
 
 interface SmokeCase {
@@ -114,6 +129,27 @@ const cases: SmokeCase[] = [
     name: "a link the sanitiser rejected does not look like a link",
     bodyHtml: '<p><a href="https://ok.example/x">good</a> <a href="http://insecure.example/x">bad</a></p>',
     check: "dead-link-not-styled",
+  },
+  {
+    name: "the mail renders on its own sheet, not on the editor background",
+    bodyHtml: '<p style="color:#000">black text the sender chose</p><div style="background:#f2f2f2">a light band with inherited text</div>',
+    check: "canvas",
+  },
+  {
+    name: "a cell keeps the colour its white text was written for",
+    bodyHtml:
+      '<table><tr><td bgcolor="#313640" colspan="2" align="center"><span style="color:#fff">PROJECT DESCRIPTION</span></td></tr></table>',
+    check: "cell-colour",
+  },
+  {
+    name: "the sender's own link colour beats the reader's",
+    bodyHtml: '<style>a{color:#ff00ff}</style><p><a href="https://ok.example/x">branded link</a></p>',
+    check: "mail-link-colour",
+  },
+  {
+    name: "a mail rule for body still beats the reader's canvas",
+    bodyHtml: "<style>body{background:#eeeeee;color:#101010}</style><p>styled by the sender</p>",
+    check: "mail-wins",
   },
   {
     name: "plain text mode",
@@ -247,6 +283,52 @@ const DRIVER = String.raw`
         { check: "the dead link is not underlined", ok: !!bad && !line(bad).includes("underline"), detail: line(bad) },
       ];
     },
+    canvas: () => {
+      const wrap = wrapper();
+      const paragraph = mail().querySelector("p");
+      const band = mail().querySelector("div[style]");
+      const contrast = (element) => {
+        const parse = (v) => { const m = /rgba?\(([^)]+)\)/.exec(v); const p = m[1].split(",").map(Number); return { r: p[0], g: p[1], b: p[2] }; };
+        const lum = (c) => { const f = (v) => { const s = v / 255; return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4); }; return 0.2126 * f(c.r) + 0.7152 * f(c.g) + 0.0722 * f(c.b); };
+        let node = element, bg = null;
+        while (node && !bg) { const c = getComputedStyle(node).backgroundColor; if (!/, 0\)$/.test(c) && c !== "transparent") bg = parse(c); node = node.parentElement; }
+        const fg = parse(getComputedStyle(element).color);
+        const l1 = lum(fg), l2 = lum(bg || { r: 255, g: 255, b: 255 });
+        return Math.round(((Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05)) * 100) / 100;
+      };
+      return [
+        { check: "the sheet is white", ok: getComputedStyle(wrap).backgroundColor === "rgb(255, 255, 255)", detail: getComputedStyle(wrap).backgroundColor },
+        { check: "the sheet's text is dark", ok: getComputedStyle(wrap).color === "rgb(31, 31, 31)", detail: getComputedStyle(wrap).color },
+        { check: "the editor background is not the mail's", ok: getComputedStyle(wrap).backgroundColor !== "rgb(31, 31, 31)", detail: getComputedStyle(wrap).backgroundColor },
+        { check: "the editor foreground is not the mail's", ok: getComputedStyle(wrap).color !== "rgb(204, 204, 204)", detail: getComputedStyle(wrap).color },
+        { check: "sender's black text is readable", ok: contrast(paragraph) >= 4.5, detail: String(contrast(paragraph)) },
+        { check: "inherited text on the sender's light band is readable", ok: contrast(band) >= 4.5, detail: String(contrast(band)) },
+        { check: "the chrome is still themed", ok: getComputedStyle(document.body).backgroundColor === "rgb(31, 31, 31)", detail: getComputedStyle(document.body).backgroundColor },
+      ];
+    },
+    "cell-colour": () => {
+      const cell = mail().querySelector("td");
+      const span = mail().querySelector("span");
+      return [
+        { check: "bgcolor is painted", ok: !!cell && getComputedStyle(cell).backgroundColor === "rgb(49, 54, 64)", detail: cell ? getComputedStyle(cell).backgroundColor : "no cell" },
+        { check: "colspan survives", ok: !!cell && cell.colSpan === 2, detail: String(cell && cell.colSpan) },
+        { check: "align survives", ok: !!cell && /center$/.test(getComputedStyle(cell).textAlign), detail: cell ? getComputedStyle(cell).textAlign : "no cell" },
+        { check: "the white text stays white", ok: !!span && getComputedStyle(span).color === "rgb(255, 255, 255)", detail: span ? getComputedStyle(span).color : "no span" },
+      ];
+    },
+    "mail-link-colour": () => {
+      const anchor = mail().querySelector("a[href]");
+      return [
+        { check: "the sender's colour is used", ok: !!anchor && getComputedStyle(anchor).color === "rgb(255, 0, 255)", detail: anchor ? getComputedStyle(anchor).color : "no anchor" },
+      ];
+    },
+    "mail-wins": () => {
+      const wrap = wrapper();
+      return [
+        { check: "the sender's background wins", ok: getComputedStyle(wrap).backgroundColor === "rgb(238, 238, 238)", detail: getComputedStyle(wrap).backgroundColor },
+        { check: "the sender's colour wins", ok: getComputedStyle(wrap).color === "rgb(16, 16, 16)", detail: getComputedStyle(wrap).color },
+      ];
+    },
     "text-mode": () => {
       const pre = mail().querySelector("pre");
       return [
@@ -278,7 +360,7 @@ const DRIVER = String.raw`
       { check: "rendered", ok: posts.some((p) => p.type === "rendered" && p.messageId === id), detail: JSON.stringify(posts.map((p) => p.type)) },
       { check: "zero CSP violations", ok: !posts.some((p) => p.type === "cspViolation"), detail: JSON.stringify(posts.filter((p) => p.type === "cspViolation")) },
       { check: "mounted in a shadow root", ok: !!mail() && !!wrapper(), detail: String(!!mail()) },
-      { check: "no mail <style> in the document", ok: document.querySelectorAll("style").length === 2, detail: String(document.querySelectorAll("style").length) },
+      { check: "no mail <style> in the document", ok: document.querySelectorAll("style").length === 3, detail: String(document.querySelectorAll("style").length) },
       { check: "status line clear", ok: (document.querySelector(".mc-status")?.textContent ?? "") === "", detail: document.querySelector(".mc-status")?.textContent ?? "" },
     ];
     if (c.check) {
@@ -328,6 +410,7 @@ function main(): number {
   const page = shell.replace(
     mainTag,
     [
+      `<style>:root{${DARK_THEME}}</style>`,
       `<script nonce="${nonce}">window.__posts=[];window.acquireVsCodeApi=()=>({postMessage(m){window.__posts.push(m)}});</script>`,
       `<script type="application/json" id="mc-cases">${JSON.stringify(cases).replaceAll("<", "\\u003c")}</script>`,
       `<script nonce="${nonce}" src="./main.js"></script>`,
