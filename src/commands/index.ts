@@ -1,10 +1,12 @@
 import * as vscode from "vscode";
 
-import { setTags as applyTagDelta } from "../daemon/client.js";
+import { moveMessage, setTags as applyTagDelta } from "../daemon/client.js";
 import { explain, isRpcError } from "../daemon/errors.js";
 import type { MailcodedDaemonSupervisor } from "../daemon/supervisor.js";
 import type { DaemonStatus } from "../daemon/types.js";
-import type { AccountDto, EnvelopeDto } from "../protocol/index.js";
+import { hardenLine } from "../model/messageFormat.js";
+import { ARCHIVE_ROLE, folderWithRole, moveTargets } from "../model/folderTree.js";
+import type { AccountDto, EnvelopeDto, FolderDto } from "../protocol/index.js";
 import { FlagNames, RpcErrorCode } from "../protocol/index.js";
 import type { MessageReader, MessageTagger } from "../reader/messageDocument.js";
 import type { ReaderPanel } from "../reader/readerPanel.js";
@@ -28,8 +30,16 @@ export const COMMAND_MARK_UNREAD = "mailcoded.markUnread";
 export const COMMAND_TOGGLE_FLAG = "mailcoded.toggleFlag";
 export const COMMAND_VIEW_HTML = "mailcoded.viewHtml";
 export const COMMAND_VIEW_PLAIN_TEXT = "mailcoded.viewPlainText";
+export const COMMAND_ARCHIVE = "mailcoded.archive";
+export const COMMAND_MOVE_TO = "mailcoded.moveTo";
 
 const SHOW_LOG = "Show Daemon Log";
+const NO_ARCHIVE = "This account has no folder marked as Archive. Use Move to Folder instead.";
+const NO_OTHER_FOLDER = "This account has no other folder to move the message into.";
+const MOVE_TITLE = "Move Message to Folder";
+const MOVE_PLACEHOLDER = "Choose a folder";
+const FOLDER_LABEL_MAX = 60;
+const ROLE_LABEL_MAX = 16;
 
 const PICK_A_MESSAGE = "Select a message in the Mailcoded messages view first.";
 
@@ -78,6 +88,83 @@ function connected(status: DaemonStatus): status is Extract<DaemonStatus, { stat
 function describe(status: DaemonStatus): string {
   const detail = status.detail;
   return `The mailcoded daemon is ${status.state}.${detail === undefined ? "" : ` ${detail}`}`;
+}
+
+/** A folder name arrives from the server, so it is hardened before it becomes a picker label. */
+async function pickFolder(folders: readonly FolderDto[]): Promise<FolderDto | undefined> {
+  if (folders.length === 0) {
+    await vscode.window.showInformationMessage(NO_OTHER_FOLDER);
+    return undefined;
+  }
+  const items = folders.map((folder) => ({
+    label: hardenLine(folder.name, FOLDER_LABEL_MAX),
+    description: folder.role === undefined ? "" : hardenLine(folder.role, ROLE_LABEL_MAX),
+    folder,
+  }));
+  const chosen = await vscode.window.showQuickPick(items, {
+    title: MOVE_TITLE,
+    placeHolder: MOVE_PLACEHOLDER,
+  });
+  return chosen?.folder;
+}
+
+/** Filing a message, which is a folder move on the server and therefore reversible. There is no
+ * delete here: a message moved to Trash is still a message in Trash. */
+async function fileMessage(
+  supervisor: MailcodedDaemonSupervisor,
+  deps: CommandDependencies,
+  node: unknown,
+  into: "archive" | "chosen",
+): Promise<void> {
+  const envelope = envelopeOf(node, deps);
+  if (envelope === undefined) {
+    await vscode.window.showInformationMessage(PICK_A_MESSAGE);
+    return;
+  }
+
+  let folders: readonly FolderDto[];
+  try {
+    folders = await supervisor.client.folderList(envelope.accountId);
+  } catch (error: unknown) {
+    await offerLog(
+      supervisor,
+      explain(error, { operation: "Reading the folder list", accountId: envelope.accountId }).text,
+      true,
+    );
+    return;
+  }
+
+  const destination =
+    into === "archive"
+      ? folderWithRole(folders, ARCHIVE_ROLE)
+      : await pickFolder(moveTargets(folders, envelope.folderId));
+  if (destination === undefined) {
+    if (into === "archive") {
+      await vscode.window.showInformationMessage(NO_ARCHIVE);
+    }
+    return;
+  }
+  if (destination.id === envelope.folderId) {
+    return;
+  }
+
+  try {
+    await moveMessage(supervisor.client, envelope.id, destination.id);
+  } catch (error: unknown) {
+    if (isAuthFailure(error)) {
+      deps.statusBar.setNeedsSignIn(true);
+    }
+    await offerLog(
+      supervisor,
+      explain(error, { operation: "Moving the message", accountId: envelope.accountId }).text,
+      true,
+    );
+    return;
+  }
+
+  // The message has left the folder the list is showing, and both counts moved with it.
+  deps.messages.refresh();
+  deps.tree.refresh();
 }
 
 async function offerLog(supervisor: MailcodedDaemonSupervisor, message: string, warn: boolean): Promise<void> {
@@ -434,5 +521,7 @@ export function registerCommands(
     vscode.commands.registerCommand(COMMAND_TOGGLE_FLAG, (node: unknown) => toggleFlag(supervisor, deps, node)),
     vscode.commands.registerCommand(COMMAND_VIEW_HTML, () => deps.readerPanel.showHtml()),
     vscode.commands.registerCommand(COMMAND_VIEW_PLAIN_TEXT, () => deps.readerPanel.showText()),
+    vscode.commands.registerCommand(COMMAND_ARCHIVE, (node: unknown) => fileMessage(supervisor, deps, node, "archive")),
+    vscode.commands.registerCommand(COMMAND_MOVE_TO, (node: unknown) => fileMessage(supervisor, deps, node, "chosen")),
   );
 }

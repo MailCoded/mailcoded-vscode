@@ -192,6 +192,18 @@
         "title": "%command.viewPlainText.title%",
         "category": "Mailcoded",
         "icon": "$(symbol-text)"
+      },
+      {
+        "command": "mailcoded.archive",
+        "title": "%command.archive.title%",
+        "category": "Mailcoded",
+        "icon": "$(archive)"
+      },
+      {
+        "command": "mailcoded.moveTo",
+        "title": "%command.moveTo.title%",
+        "category": "Mailcoded",
+        "icon": "$(file-symlink-directory)"
       }
     ],
     "menus": {
@@ -247,6 +259,16 @@
           "command": "mailcoded.toggleFlag",
           "when": "view == mailcoded.messages && (viewItem == message.unread || viewItem == message.read)",
           "group": "1_triage@2"
+        },
+        {
+          "command": "mailcoded.archive",
+          "when": "view == mailcoded.messages && (viewItem == message.unread || viewItem == message.read)",
+          "group": "2_file@1"
+        },
+        {
+          "command": "mailcoded.moveTo",
+          "when": "view == mailcoded.messages && (viewItem == message.unread || viewItem == message.read)",
+          "group": "2_file@2"
         }
       ],
       "commandPalette": [

@@ -26,6 +26,27 @@ const ROLE_ORDER: readonly string[] = ["inbox", "drafts", "sent", "trash", "junk
 
 export const FOLDER_DELIMITER = "/";
 
+export const ARCHIVE_ROLE = "archive";
+
+/** The folder with a given server role, when the account has one. */
+export function folderWithRole(folders: readonly FolderDto[], role: string): FolderDto | undefined {
+  const wanted = role.toLowerCase();
+  for (const folder of folders) {
+    if (folder.role?.toLowerCase() === wanted) {
+      return folder;
+    }
+  }
+  return undefined;
+}
+
+/** Where a message can be filed, ordered the way the sidebar orders folders, without the folder
+ * it already lives in. */
+export function moveTargets(folders: readonly FolderDto[], fromFolderId: number): readonly FolderDto[] {
+  return [...folders]
+    .filter((folder) => folder.id !== fromFolderId)
+    .sort((left, right) => roleRank(left.role) - roleRank(right.role) || left.name.localeCompare(right.name));
+}
+
 export function accountKey(accountId: number): string {
   return `a:${accountId}`;
 }

@@ -5,6 +5,7 @@ import type {
   FolderDto,
   HealthDto,
   MessageGetResult,
+  MessageMoveResult,
   RpcMethodMap,
   RpcMethodName,
   SearchParams,
@@ -56,6 +57,15 @@ export function getMessageHtmlForWebview(
   fetchIfMissing: boolean,
 ): Promise<MessageGetResult> {
   return client.request("message.get", { messageId, format: MessageFormats.Html, fetchIfMissing });
+}
+
+/** Filing, not deleting: the message keeps existing, in another folder on the same server. */
+export function moveMessage(
+  client: MailcodedClient,
+  messageId: number,
+  toFolderId: number,
+): Promise<MessageMoveResult> {
+  return client.request("message.move", { messageId, toFolderId });
 }
 
 export function setTags(

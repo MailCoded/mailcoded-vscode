@@ -61,6 +61,9 @@ interface FakeVscodeState {
   readonly inputBoxAnswers: (string | undefined)[];
   readonly messageAnswers: (string | undefined)[];
   readonly progress: string[];
+  readonly quickPickAnswers: (string | undefined)[];
+  readonly quickPicks: string[][];
+  readonly commandHandlers: Map<string, (...args: readonly unknown[]) => unknown>;
   readonly webviewPanels: FakeWebviewPanel[];
   webviewCspSource: string;
 }
@@ -84,6 +87,9 @@ const state: FakeVscodeState = ((): FakeVscodeState => {
     inputBoxAnswers: [],
     messageAnswers: [],
     progress: [],
+    quickPickAnswers: [],
+    quickPicks: [],
+    commandHandlers: new Map<string, (...args: readonly unknown[]) => unknown>(),
     webviewPanels: [],
     webviewCspSource: REAL_WEBVIEW_CSP_SOURCE,
   };
@@ -97,6 +103,8 @@ class Recorder {
   readonly webviewPanels = state.webviewPanels;
   /** Titles passed to `window.withProgress`, so "the user was told it is working" is testable. */
   readonly progress = state.progress;
+  /** The labels offered by each `window.showQuickPick` call, in order. */
+  readonly quickPicks = state.quickPicks;
 
   reset(): void {
     this.channels.clear();
@@ -105,6 +113,9 @@ class Recorder {
     state.inputBoxAnswers.length = 0;
     state.messageAnswers.length = 0;
     this.progress.length = 0;
+    state.quickPickAnswers.length = 0;
+    this.quickPicks.length = 0;
+    state.commandHandlers.clear();
     this.webviewPanels.length = 0;
     state.webviewCspSource = REAL_WEBVIEW_CSP_SOURCE;
   }
@@ -117,6 +128,11 @@ class Recorder {
   /** What `window.showInputBox` answers, in order; an exhausted queue answers `undefined`. */
   answerInputBox(...answers: readonly (string | undefined)[]): void {
     state.inputBoxAnswers.push(...answers);
+  }
+
+  /** Which label `window.showQuickPick` picks, in order; an exhausted queue dismisses the pick. */
+  answerQuickPick(...answers: readonly (string | undefined)[]): void {
+    state.quickPickAnswers.push(...answers);
   }
 
   /** Which button a notification is answered with, in order. An answer the call did not offer is
@@ -372,6 +388,11 @@ export const window = {
     return task();
   },
   showSaveDialog: (): Promise<FakeUri | undefined> => Promise.resolve(undefined),
+  showQuickPick: <T extends { label: string }>(items: readonly T[]): Promise<T | undefined> => {
+    state.quickPicks.push(items.map((item) => item.label));
+    const wanted = state.quickPickAnswers.shift();
+    return Promise.resolve(wanted === undefined ? undefined : items.find((item) => item.label === wanted));
+  },
 };
 
 export const workspace = {
@@ -391,9 +412,21 @@ export const workspace = {
   onDidGrantWorkspaceTrust: trustGranted.event,
 };
 
+/** Handlers are kept, so a test can invoke a contributed command the way the palette does. An
+ * unregistered command resolves to undefined, as it did before. */
 export const commands = {
-  executeCommand: (): Promise<undefined> => Promise.resolve(undefined),
-  registerCommand: (): FakeDisposable => ({ dispose: () => undefined }),
+  executeCommand: async (command: string, ...args: readonly unknown[]): Promise<unknown> => {
+    const handler = state.commandHandlers.get(command);
+    return handler === undefined ? undefined : await handler(...args);
+  },
+  registerCommand: (command: string, handler: (...args: readonly unknown[]) => unknown): FakeDisposable => {
+    state.commandHandlers.set(command, handler);
+    return {
+      dispose: () => {
+        state.commandHandlers.delete(command);
+      },
+    };
+  },
 };
 
 export const env = {
