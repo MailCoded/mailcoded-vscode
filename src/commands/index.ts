@@ -25,6 +25,7 @@ export const COMMAND_OPEN_FOLDER = "mailcoded.openFolder";
 export const COMMAND_OPEN_MESSAGE = "mailcoded.openMessage";
 export const COMMAND_LOAD_MORE = "mailcoded.loadMore";
 export const COMMAND_SEARCH = "mailcoded.search";
+export const COMMAND_SEARCH_BY_MEANING = "mailcoded.searchByMeaning";
 export const COMMAND_MARK_READ = "mailcoded.markRead";
 export const COMMAND_MARK_UNREAD = "mailcoded.markUnread";
 export const COMMAND_TOGGLE_FLAG = "mailcoded.toggleFlag";
@@ -284,6 +285,7 @@ async function showDaemonInfo(supervisor: MailcodedDaemonSupervisor): Promise<vo
     `Daemon ${status.daemonVersion}`,
     `${String(capabilities.methods.length)} methods`,
     `max search ${String(capabilities.maxSearchLimit)}`,
+    capabilities.semantic ? "search by meaning available" : "no search model",
     `${String(accounts)} ${accounts === 1 ? "account" : "accounts"}`,
   ];
   if (status.state === "secondary") {
@@ -396,10 +398,10 @@ async function openMessage(deps: CommandDependencies, messageId: unknown): Promi
 }
 
 /** A query is scoped to one account: the selected one, or the first the daemon lists. */
-async function searchMail(
+async function accountForSearch(
   supervisor: MailcodedDaemonSupervisor,
   deps: CommandDependencies,
-): Promise<void> {
+): Promise<number | undefined> {
   let accountId = deps.selection.accountId();
   if (accountId === undefined) {
     let accounts: readonly AccountDto[];
@@ -407,12 +409,23 @@ async function searchMail(
       accounts = await supervisor.client.accountList();
     } catch (error: unknown) {
       await offerLog(supervisor, explain(error, { operation: "Reading the account list" }).text, true);
-      return;
+      return undefined;
     }
     accountId = accounts[0]?.id;
   }
   if (accountId === undefined) {
     await vscode.window.showInformationMessage("There are no mail accounts to search yet.");
+    return undefined;
+  }
+  return accountId;
+}
+
+async function searchMail(
+  supervisor: MailcodedDaemonSupervisor,
+  deps: CommandDependencies,
+): Promise<void> {
+  const accountId = await accountForSearch(supervisor, deps);
+  if (accountId === undefined) {
     return;
   }
 
@@ -430,6 +443,42 @@ async function searchMail(
   }
 
   deps.messages.show({ accountId, query });
+  deps.selection.revealMessages();
+}
+
+/** Meaning is a separate verb, not a toggle on `search`: it asks a different question. */
+async function searchByMeaning(
+  supervisor: MailcodedDaemonSupervisor,
+  deps: CommandDependencies,
+): Promise<void> {
+  const status = supervisor.status;
+  if ((status.state === "ready" || status.state === "secondary") && !status.capabilities.semantic) {
+    await vscode.window.showInformationMessage(
+      "This daemon has no embedding model installed, so it cannot search by meaning. " +
+        "Searching by words works without one.",
+    );
+    return;
+  }
+
+  const accountId = await accountForSearch(supervisor, deps);
+  if (accountId === undefined) {
+    return;
+  }
+
+  const typed = await vscode.window.showInputBox({
+    title: "Search Mail by Meaning",
+    prompt:
+      "Describe what the message was about. Word matches still come first; messages that only match " +
+      "in meaning follow them.",
+    placeHolder: "the thing about the leaking roof",
+    ignoreFocusOut: true,
+  });
+  const query = typed?.trim() ?? "";
+  if (query === "") {
+    return;
+  }
+
+  deps.messages.show({ accountId, query, semantic: true });
   deps.selection.revealMessages();
 }
 
@@ -512,6 +561,7 @@ export function registerCommands(
     vscode.commands.registerCommand(COMMAND_OPEN_MESSAGE, (messageId: unknown) => openMessage(deps, messageId)),
     vscode.commands.registerCommand(COMMAND_LOAD_MORE, () => deps.messages.loadMore()),
     vscode.commands.registerCommand(COMMAND_SEARCH, () => searchMail(supervisor, deps)),
+    vscode.commands.registerCommand(COMMAND_SEARCH_BY_MEANING, () => searchByMeaning(supervisor, deps)),
     vscode.commands.registerCommand(COMMAND_MARK_READ, (node: unknown) =>
       changeTags(supervisor, deps, node, [], [FlagNames.Unread], "Marking the message read"),
     ),

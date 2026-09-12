@@ -6,6 +6,10 @@ export interface PageState {
   readonly truncated: boolean;
   /** Matches were dropped that no further page can reach — rpc.md §7.1, the strong `truncated`. */
   readonly unreachable: boolean;
+  /** No message matched every word; these match some of them. */
+  readonly relaxed: boolean;
+  /** Meaning took part in the ranking. Such a page has no cursor, by design. */
+  readonly semantic: boolean;
 }
 
 const EMPTY: PageState = Object.freeze({
@@ -13,6 +17,8 @@ const EMPTY: PageState = Object.freeze({
   nextCursor: undefined,
   truncated: false,
   unreachable: false,
+  relaxed: false,
+  semantic: false,
 });
 
 export function emptyPage(): PageState {
@@ -38,6 +44,8 @@ export function appendPage(state: PageState, result: SearchResult): PageState {
     nextCursor: cursor,
     truncated: result.truncated,
     unreachable: result.truncated && cursor === undefined,
+    relaxed: result.relaxed,
+    semantic: result.semantic,
   };
 }
 

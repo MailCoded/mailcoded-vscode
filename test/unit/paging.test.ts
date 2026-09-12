@@ -20,8 +20,18 @@ function envelope(id: number, subject: string): EnvelopeDto {
   };
 }
 
-function page(hits: readonly EnvelopeDto[], cursor?: string, truncated = false): SearchResult {
-  const base: SearchResult = { hits, truncated };
+function page(
+  hits: readonly EnvelopeDto[],
+  cursor?: string,
+  truncated = false,
+  flags: { relaxed?: boolean; semantic?: boolean } = {},
+): SearchResult {
+  const base: SearchResult = {
+    hits,
+    truncated,
+    relaxed: flags.relaxed ?? false,
+    semantic: flags.semantic ?? false,
+  };
   return cursor === undefined ? base : { ...base, nextCursor: cursor };
 }
 
@@ -37,6 +47,25 @@ describe("emptyPage", () => {
     assert.equal(state.nextCursor, undefined);
     assert.equal(state.truncated, false);
     assert.equal(state.unreachable, false);
+    assert.equal(state.relaxed, false);
+    assert.equal(state.semantic, false);
+  });
+
+  it("carries the relaxed and semantic flags the daemon reported", () => {
+    const relaxed = appendPage(emptyPage(), page([envelope(1, "one")], undefined, false, { relaxed: true }));
+    assert.equal(relaxed.relaxed, true);
+    assert.equal(relaxed.semantic, false);
+
+    const meaning = appendPage(emptyPage(), page([envelope(2, "two")], undefined, false, { semantic: true }));
+    assert.equal(meaning.semantic, true);
+    assert.equal(meaning.relaxed, false);
+  });
+
+  it("treats a fused page as complete: no cursor is not a loss", () => {
+    const state = appendPage(emptyPage(), page([envelope(1, "one")], undefined, false, { semantic: true }));
+
+    assert.equal(state.nextCursor, undefined);
+    assert.equal(state.unreachable, false, "a fused ranking has no cursor by design, and drops nothing");
   });
 });
 

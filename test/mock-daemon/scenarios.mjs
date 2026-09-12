@@ -97,7 +97,7 @@ const SEND_PREVIEW_RESULT = {
   confirmTokenExpiresUtc: "2026-08-30T12:39:56.000Z",
 };
 
-export function initializeResult({ protocolVersion = 1, watch = true, methods } = {}) {
+export function initializeResult({ protocolVersion = 1, watch = true, semantic = false, methods } = {}) {
   return {
     daemonVersion: GOLDEN_DAEMON_VERSION,
     protocolVersion,
@@ -106,6 +106,7 @@ export function initializeResult({ protocolVersion = 1, watch = true, methods } 
       secretBackend: SECRET_BACKEND,
       methods: methods ?? GOLDEN_METHODS,
       watch,
+      semantic,
     },
   };
 }
@@ -281,11 +282,27 @@ function offsetOf(cursor) {
 }
 
 /** A folder browse pages to any depth; a relevance query drops what its offset cap cannot reach. */
-function searchResult(params) {
+function searchResult(params, { semantic = false } = {}) {
   const limit = params?.limit;
   const query = typeof params?.query === "string" ? params.query.trim() : "";
   if (query !== "") {
-    return { hits: [listEnvelope(201, 0), listEnvelope(201, 1)], nextCursor: null, truncated: true };
+    // A fused ranking is one page by design, so it answers with no cursor and nothing dropped.
+    if (semantic && params?.semantic !== false) {
+      return {
+        hits: [listEnvelope(201, 0), listEnvelope(201, 1)],
+        nextCursor: null,
+        truncated: false,
+        relaxed: false,
+        semantic: true,
+      };
+    }
+    return {
+      hits: [listEnvelope(201, 0), listEnvelope(201, 1)],
+      nextCursor: null,
+      truncated: true,
+      relaxed: query.split(/\s+/).length > 1,
+      semantic: false,
+    };
   }
 
   const folderId = params?.folderId;
@@ -295,7 +312,7 @@ function searchResult(params) {
   const hits = [];
   for (let index = from; index < to; index += 1) hits.push(listEnvelope(folderId, index));
   const more = to < total;
-  return { hits, nextCursor: more ? cursorAt(to) : null, truncated: more };
+  return { hits, nextCursor: more ? cursorAt(to) : null, truncated: more, relaxed: false, semantic: false };
 }
 
 /** rpc.md §4: `accountId` is required, `folderIds` is optional and must be an array of numbers.
@@ -317,12 +334,13 @@ function accountsScenario({
   folders = TREE_FOLDERS,
   failFor = [],
   watch = true,
+  semantic = false,
   searchFails = false,
   refuseWatch = false,
 } = {}) {
   const failing = new Set(failFor);
   return {
-    initializeOptions: { watch },
+    initializeOptions: { watch, semantic },
     handle(ctx, request) {
       const { method, id, params } = request;
       if (method === "account.list") {
@@ -391,7 +409,11 @@ function accountsScenario({
           });
           return;
         }
-        ctx.reply(id, searchResult(params));
+        if (params?.semantic === true && !semantic) {
+          ctx.error(id, 1008, "No embedding model is installed, so this build cannot search by meaning.", {"category": "unsupported", "requiresUserAction": false});
+          return;
+        }
+        ctx.reply(id, searchResult(params, { semantic }));
         return;
       }
       baseHandle(ctx, request);
@@ -494,6 +516,9 @@ export const SCENARIOS = {
 
   /** Every `search` answers 1004: the message list must render empty, never reject. */
   accountsSearchFails: accountsScenario({ searchFails: true }),
+
+  /** A daemon with an embedding model: `search` fuses meaning in and answers one cursorless page. */
+  accountsSemantic: accountsScenario({ semantic: true }),
 
   /** `watch.subscribe` answers 1008 for every account: a refusal is final, never retried. */
   accountsWatchRefused: accountsScenario({ refuseWatch: true }),

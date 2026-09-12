@@ -87,7 +87,8 @@ function scopeTitle(messages: MessagesTreeProvider): string {
     return "";
   }
   const where = "folderName" in scope ? hardenLine(scope.folderName, 40) : `"${hardenLine(scope.query, 40)}"`;
-  return `${where} · ${String(messages.messageCount)}`;
+  const meaning = "folderName" in scope || scope.semantic !== true ? "" : " · by meaning";
+  return `${where} · ${String(messages.messageCount)}${meaning}`;
 }
 
 export function activate(context: vscode.ExtensionContext): MailcodedApi {

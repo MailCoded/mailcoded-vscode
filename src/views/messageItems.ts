@@ -25,6 +25,7 @@ export interface LoadMoreNode {
 
 export interface NoticeNode {
   readonly kind: "notice";
+  readonly id: string;
   readonly text: string;
   readonly detail: string;
 }
@@ -49,8 +50,8 @@ export function loadMoreNode(): LoadMoreNode {
   return { kind: "loadMore" };
 }
 
-export function noticeNode(text: string, detail: string): NoticeNode {
-  return { kind: "notice", text, detail };
+export function noticeNode(id: string, text: string, detail: string): NoticeNode {
+  return { kind: "notice", id, text, detail };
 }
 
 function hasFlag(envelope: EnvelopeDto, flag: string): boolean {
@@ -145,7 +146,8 @@ function loadMoreItem(): vscode.TreeItem {
 
 function noticeItem(node: NoticeNode): vscode.TreeItem {
   const item = new vscode.TreeItem(hardenLine(node.text), vscode.TreeItemCollapsibleState.None);
-  item.id = "notice";
+  // A fixed id collides the moment two notices show at once, and VS Code drops the duplicate.
+  item.id = `notice:${node.id}`;
   item.iconPath = new vscode.ThemeIcon("info");
   item.contextValue = "notice";
   item.tooltip = hardenLine(node.detail);

@@ -163,6 +163,69 @@ describe("the message list", () => {
     view.dispose();
   });
 
+  it("says so when nothing matched every word, without hiding the dropped-matches notice", async () => {
+    const view = await messagesView();
+    view.show({ accountId: ACCOUNT, query: "invoice roof" });
+
+    const nodes = await view.getChildren();
+    const notices = nodes.filter((node) => node.kind === "notice");
+    assert.equal(notices.length, 2, "a widened query that also drops matches has two things to say");
+
+    const texts = notices.map((node) => (node.kind === "notice" ? node.text : ""));
+    assert.ok(
+      texts.some((text) => /every word/i.test(text)),
+      `expected a relaxed notice, got ${JSON.stringify(texts)}`,
+    );
+
+    const ids = notices.map((node) => view.getTreeItem(node).id);
+    assert.equal(new Set(ids).size, ids.length, "two notices sharing a TreeItem id: VS Code drops one");
+    view.dispose();
+  });
+
+  it("says when meaning took part in the ranking, and offers no next page", async () => {
+    const view = await messagesView("accountsSemantic");
+    view.show({ accountId: ACCOUNT, query: "the leaking roof thing" });
+
+    const nodes = await view.getChildren();
+    const notices = nodes.filter((node) => node.kind === "notice");
+    const notice = notices[0];
+
+    assert.equal(notices.length, 1);
+    assert.ok(notice !== undefined && notice.kind === "notice");
+    assert.match(notice.text, /meaning/i);
+    assert.match(notice.detail, /may not be relevant/i, "the page fills up; say so rather than imply relevance");
+    assert.equal(kinds(nodes).includes("loadMore"), false, "a fused ranking is one page");
+    assert.equal(view.getTreeItem(notice).id, "notice:semantic");
+    view.dispose();
+  });
+
+  it("asks for words only when the search mode says so", async () => {
+    configuration.set("mailcoded.searchMode", "words");
+    try {
+      const view = await messagesView("accountsSemantic");
+      view.show({ accountId: ACCOUNT, query: "the leaking roof thing" });
+
+      const nodes = await view.getChildren();
+      assert.equal(
+        nodes.some((node) => node.kind === "notice" && /meaning/i.test(node.text)),
+        false,
+        "searchMode 'words' must send semantic:false, which the mock answers without fusing",
+      );
+      view.dispose();
+    } finally {
+      configuration.delete("mailcoded.searchMode");
+    }
+  });
+
+  it("renders empty rather than throwing when meaning is asked of a daemon without a model", async () => {
+    const view = await messagesView();
+    view.show({ accountId: ACCOUNT, query: "the leaking roof thing", semantic: true });
+
+    assert.deepEqual(await view.getChildren(), [], "1008 is a refusal, not a crash");
+    assert.ok(recorder.everything().includes("search failed"), "the refusal is logged");
+    view.dispose();
+  });
+
   it("keeps a truncated folder page paging rather than calling it a loss", async () => {
     const view = await messagesView();
     view.show({ accountId: ACCOUNT, folderId: INBOX, folderName: "INBOX" });

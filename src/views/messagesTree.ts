@@ -24,6 +24,16 @@ const UNREACHABLE_TEXT = "Some matches were dropped";
 const UNREACHABLE_DETAIL =
   "Relevance paging cannot reach every match for this query. Narrow the query, or sort by date, whose cursor reaches any depth.";
 
+const RELAXED_TEXT = "Nothing matched every word";
+const RELAXED_DETAIL =
+  "These messages match some of the words, best first. Quote a phrase, or add from: or subject:, to tighten the search.";
+
+const SEMANTIC_TEXT = "Ranked by meaning as well as words";
+const SEMANTIC_DETAIL =
+  "A model ranked these by what they are about, fused with the word matches, which stay first where both agree. " +
+  "Every embedded message is a candidate, so the list fills up: below the strong matches are simply the nearest " +
+  "remaining messages, which may not be relevant. This is one page; a fused ranking has no next page.";
+
 export interface FolderScope {
   readonly accountId: number;
   readonly folderId: number;
@@ -33,12 +43,22 @@ export interface FolderScope {
 export interface QueryScope {
   readonly accountId: number;
   readonly query: string;
+  /** True asks the daemon for meaning, false for words only, absent leaves it to the setting. */
+  readonly semantic?: boolean;
 }
 
 export type MessageScope = FolderScope | QueryScope;
 
 function isFolderScope(scope: MessageScope): scope is FolderScope {
   return "folderId" in scope;
+}
+
+/** Omitted rather than false when the setting is "auto": absent lets the daemon decide. */
+function semanticParam(scope: QueryScope): { semantic?: boolean } {
+  if (scope.semantic !== undefined) {
+    return { semantic: scope.semantic };
+  }
+  return readConfiguration().searchMode === "words" ? { semantic: false } : {};
 }
 
 function newer(left: EnvelopeDto, right: EnvelopeDto): number {
@@ -183,8 +203,14 @@ export class MessagesTreeProvider implements vscode.TreeDataProvider<MessageTree
     if (this.#page.nextCursor !== undefined) {
       nodes.push(loadMoreNode());
     }
+    if (this.#page.semantic) {
+      nodes.push(noticeNode("semantic", SEMANTIC_TEXT, SEMANTIC_DETAIL));
+    }
+    if (this.#page.relaxed) {
+      nodes.push(noticeNode("relaxed", RELAXED_TEXT, RELAXED_DETAIL));
+    }
     if (this.#page.unreachable) {
-      nodes.push(noticeNode(UNREACHABLE_TEXT, UNREACHABLE_DETAIL));
+      nodes.push(noticeNode("unreachable", UNREACHABLE_TEXT, UNREACHABLE_DETAIL));
     }
     return nodes;
   }
@@ -244,6 +270,7 @@ export class MessagesTreeProvider implements vscode.TreeDataProvider<MessageTree
           order: SearchOrders.Relevance,
           includeSnippet: true,
           limit,
+          ...semanticParam(scope),
         };
     return cursor === undefined ? base : { ...base, cursor };
   }

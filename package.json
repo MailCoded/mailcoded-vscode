@@ -146,6 +146,12 @@
         "icon": "$(search)"
       },
       {
+        "command": "mailcoded.searchByMeaning",
+        "title": "%command.searchByMeaning.title%",
+        "category": "Mailcoded",
+        "icon": "$(sparkle)"
+      },
+      {
         "command": "mailcoded.markRead",
         "title": "%command.markRead.title%",
         "category": "Mailcoded",
@@ -237,6 +243,11 @@
           "command": "mailcoded.search",
           "when": "view == mailcoded.messages",
           "group": "navigation@1"
+        },
+        {
+          "command": "mailcoded.searchByMeaning",
+          "when": "view == mailcoded.messages && mailcoded.semantic",
+          "group": "navigation@2"
         }
       ],
       "view/item/context": [
@@ -295,6 +306,10 @@
         {
           "command": "mailcoded.viewPlainText",
           "when": "false"
+        },
+        {
+          "command": "mailcoded.searchByMeaning",
+          "when": "mailcoded.semantic"
         }
       ],
       "editor/title": [
@@ -390,6 +405,19 @@
           "default": 60,
           "minimum": 15,
           "description": "%config.pollIntervalSeconds.description%"
+        },
+        "mailcoded.searchMode": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "words"
+          ],
+          "enumDescriptions": [
+            "%config.searchMode.auto%",
+            "%config.searchMode.words%"
+          ],
+          "default": "auto",
+          "description": "%config.searchMode.description%"
         }
       }
     },

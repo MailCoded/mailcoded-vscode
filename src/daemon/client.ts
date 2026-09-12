@@ -34,6 +34,16 @@ function boundedLimit(limit: number | undefined, capability: number): number {
 }
 
 export function searchMessages(client: MailcodedClient, params: SearchParams): Promise<SearchResult> {
+  // The daemon answers 1008 for this too; refusing here keeps the round trip off a search that
+  // cannot succeed, and gives the caller the same error either way.
+  if (params.semantic === true && !client.capabilities.semantic) {
+    return Promise.reject(
+      new RpcError(RpcErrorCode.Unsupported, "This daemon cannot search by meaning.", {
+        category: "unsupported",
+        detail: "This daemon has no embedding model, so it cannot search by meaning.",
+      }),
+    );
+  }
   return client.request("search", {
     ...params,
     limit: boundedLimit(params.limit, client.capabilities.maxSearchLimit),

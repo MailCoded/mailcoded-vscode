@@ -21,6 +21,8 @@
         ]
       }
     ],
+    "relaxed": false,
+    "semantic": false,
     "truncated": false
   }
 }

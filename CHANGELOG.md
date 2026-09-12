@@ -12,6 +12,20 @@ of this extension that reads mail. What exists is a scaffold that builds.
 
 ### Added
 
+- **Search by meaning, where the daemon offers it.** `search` now carries the engine's `semantic`
+  parameter and surfaces the `relaxed` and `semantic` flags it answers with. A new command,
+  *Search Mail by Meaning...*, asks for it explicitly; a new setting, `mailcoded.searchMode`
+  (`auto` | `words`), decides what an ordinary search does. `auto` leaves the choice to the daemon,
+  which fuses meaning in only when a model is installed.
+  - The message list explains itself rather than silently reordering: *"Ranked by meaning as well
+    as words"* when fusion happened, and *"Nothing matched every word"* when the daemon widened a
+    query. A fused page carries no cursor by design, so no **Load More** row is offered and the
+    absence is not reported as dropped matches.
+  - Asking for meaning from a daemon with no model is refused in the client with `1008` rather than
+    sent, and the command says so before opening an input box. The command and its toolbar button
+    are hidden unless `capabilities.semantic` is true.
+  - **The engine ships no model**, so on a default install this changes nothing, and whether the
+    ranking is an improvement is unmeasured upstream.
 - **Build pipeline.** TypeScript compiled by esbuild into two bundles:
   `src/extension.ts` → `dist/extension.js` (node22, CJS, `vscode` external) and
   `src/webview/main.ts` → `dist/webview/main.js` (browser, IIFE), with

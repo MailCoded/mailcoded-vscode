@@ -1,0 +1,12 @@
+{
+  "error": {
+    "code": 1008,
+    "data": {
+      "category": "unsupported",
+      "requiresUserAction": false
+    },
+    "message": "No embedding model is installed, so this build cannot search by meaning."
+  },
+  "id": 14,
+  "jsonrpc": "2.0"
+}

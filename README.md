@@ -15,6 +15,8 @@ client talks to a language server. Every safety gate lives in the engine, not he
 
 - Sidebar `TreeDataProvider`: accounts → saved searches → folders, with unread badges
 - Threaded message list, cursor-paged 50 at a time
+- Search over words, and — when the daemon has an embedding model — over meaning too, with a
+  notice on the list saying which ranking produced it
 - Reader in a sandboxed webview: plaintext by default, sanitized HTML behind a toggle,
   remote images blocked with a per-message allow
 - Compose buffer with a header block, then confirm → `send.preview` → `send`
@@ -117,19 +119,22 @@ Default store roots: `%LOCALAPPDATA%\mailcoded` on Windows,
 
 ## What does not work yet
 
-Stated plainly, because the status line above is easy to skim past. As of this commit there is:
+Stated plainly, because the status line above is easy to skim past. Reading works: the extension
+spawns the daemon, negotiates `initialize`, and gives you a sidebar, a threaded message list, a
+sandboxed reader, search, sync, and read/unread/flag/archive/move. What is still missing:
 
-- **No daemon process management.** Nothing spawns `mailcoded-daemon`, so `MAILCODED_DAEMON` is
-  read by nothing yet. The variable is documented above because it is the contract the client will
-  use, not because setting it does anything today.
-- **No JSON-RPC client.** No connection, no `initialize`, no method call.
-- **No UI at all** — no sidebar, no message list, no reader webview, no compose buffer, no status
-  bar item, no onboarding flow, no commands worth invoking. `activate()` opens an output channel
-  named *Mailcoded Daemon* and returns.
-- **No tests.** The `test:unit`, `test:sanitize` and `test:e2e` scripts are declared, and the CI
-  job that would run them deliberately does not exist yet, because a workflow calling a harness
-  that has not landed is just a red build.
-- No account setup, no sync, no search, no send, no attachments, no tags.
+- **No account setup.** There is no add-account flow, so an account has to exist already — create
+  one with the engine's `mailcoded setup`. `command.addAccount.title` is a string with nothing
+  behind it yet.
+- **No compose, reply, or send.** The two-phase `send.preview` → `send` path is engine-side only;
+  no command here reaches it, and the same is true of the outbox view.
+- **No attachment saving and no tag editing.** Attachments are listed, not written to disk, and
+  tags beyond unread/flagged have no editor.
+- **Search by meaning depends on a model the engine does not ship.** The command, the setting and
+  the notices are all here, but no model is pinned upstream, and whether its ranking is better than
+  plain full-text search is unmeasured. Treat it as unfinished.
+- **`test:e2e` has not been run here.** `test:unit` and `test:sanitize` pass; the VS Code
+  download-and-drive harness is declared but unexercised in this environment.
 
 The protocol types are vendored from the engine and checked in; `npm run sync:protocol` refreshes
 them. The `protocol-drift` CI job is advisory by design — the engine's default branch moves

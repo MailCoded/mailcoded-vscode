@@ -6,6 +6,7 @@ import type { CapabilitiesDto } from "./protocol/index.js";
 export const CONTEXT_STATE = "mailcoded.state";
 export const CONTEXT_TRUSTED = "mailcoded.trusted";
 export const CONTEXT_CAN_SEND = "mailcoded.canSend";
+export const CONTEXT_SEMANTIC = "mailcoded.semantic";
 
 /** The manifest's `viewsWelcome` also tests `noAccounts`, which no daemon state carries. */
 export type ContextState = DaemonState | "noAccounts";
@@ -58,6 +59,7 @@ export class ContextKeys implements vscode.Disposable {
     this.set(CONTEXT_STATE, contextState(this.status, this.accountCount));
     this.set(CONTEXT_TRUSTED, vscode.workspace.isTrusted);
     this.set(CONTEXT_CAN_SEND, canSend(capabilities));
+    this.set(CONTEXT_SEMANTIC, capabilities?.semantic ?? false);
   }
 
   private set(key: string, value: string | boolean): void {

@@ -6,6 +6,10 @@ export const LOG_LEVELS = ["off", "error", "warn", "info", "debug"] as const;
 
 export type LogLevel = (typeof LOG_LEVELS)[number];
 
+export const SEARCH_MODES = ["auto", "words"] as const;
+
+export type SearchMode = (typeof SEARCH_MODES)[number];
+
 export interface MailcodedConfig {
   /** Restricted: empty in an untrusted workspace, whatever the settings say. */
   readonly daemonPath: string;
@@ -18,6 +22,7 @@ export interface MailcodedConfig {
   readonly quoteLines: number;
   readonly threadGrouping: boolean;
   readonly pollIntervalSeconds: number;
+  readonly searchMode: SearchMode;
 }
 
 export const CONFIG_DEFAULTS: MailcodedConfig = {
@@ -30,6 +35,7 @@ export const CONFIG_DEFAULTS: MailcodedConfig = {
   quoteLines: 200,
   threadGrouping: true,
   pollIntervalSeconds: 60,
+  searchMode: "auto",
 };
 
 export const PAGE_SIZE_MIN = 10;
@@ -49,6 +55,12 @@ function boolean(value: unknown, fallback: boolean): boolean {
 
 function text(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function searchMode(value: unknown): SearchMode {
+  return typeof value === "string" && (SEARCH_MODES as readonly string[]).includes(value)
+    ? (value as SearchMode)
+    : CONFIG_DEFAULTS.searchMode;
 }
 
 function logLevel(value: unknown): LogLevel {
@@ -73,6 +85,7 @@ export function readConfiguration(scope?: vscode.ConfigurationScope): MailcodedC
     logLevel: logLevel(section.get("logLevel")),
     quoteLines: clampInteger(section.get("quoteLines"), CONFIG_DEFAULTS.quoteLines, 0, Number.MAX_SAFE_INTEGER),
     threadGrouping: boolean(section.get("threadGrouping"), CONFIG_DEFAULTS.threadGrouping),
+    searchMode: searchMode(section.get("searchMode")),
     pollIntervalSeconds: clampInteger(
       section.get("pollIntervalSeconds"),
       CONFIG_DEFAULTS.pollIntervalSeconds,

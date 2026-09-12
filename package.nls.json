@@ -54,5 +54,9 @@
   "config.threadGrouping.description": "Group the message list into conversation threads.",
   "config.pollIntervalSeconds.description": "How often the daemon polls a folder for new mail when the server does not support IMAP IDLE.",
   "welcome.connected": "Connected to the mailcoded daemon.\nYour accounts and folders appear here as soon as they load.\n[Refresh](command:mailcoded.refresh)\n[Show daemon info](command:mailcoded.showDaemonInfo)",
-  "welcome.starting": "Starting the mailcoded daemon…\n[Show log](command:mailcoded.showDaemonLog)"
+  "welcome.starting": "Starting the mailcoded daemon\u2026\n[Show log](command:mailcoded.showDaemonLog)",
+  "command.searchByMeaning.title": "Search Mail by Meaning...",
+  "config.searchMode.description": "Whether a search may also rank by what a message is about. 'auto' lets the daemon use an embedding model when one is installed; 'words' asks for full-text matching only.",
+  "config.searchMode.auto": "Rank by meaning as well as words when the daemon has a model installed.",
+  "config.searchMode.words": "Rank by words only, even when a model is installed."
 }
