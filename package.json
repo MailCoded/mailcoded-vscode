@@ -464,7 +464,7 @@
   },
   "dependencies": {
     "dompurify": "^3.4.14",
-    "vscode-jsonrpc": "^9.0.2"
+    "vscode-jsonrpc": "^10.0.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
